@@ -1,61 +1,283 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../api/index';
+import { AuthContext } from '../context/AuthContext';
+import { apiCall } from '../utils/apiUtils';
 
 function SupplierManagement() {
   const [suppliers, setSuppliers] = useState([]);
-  const [newSupplier, setNewSupplier] = useState({ name: '', email: '', phone: '', address: '' });
+  const [supplierForm, setSupplierForm] = useState({ 
+    name: '', 
+    email: '', 
+    phone: '', 
+    notes: ''
+  });
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [editMode, setEditMode] = useState(false);
+  const [editingSupplierId, setEditingSupplierId] = useState(null);
+  const [selectedSuppliers, setSelectedSuppliers] = useState({});
+  const [selectAll, setSelectAll] = useState(false);
+  const [selectionFilter, setSelectionFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [bulkAction, setBulkAction] = useState('');
+  const [bulkEditField, setBulkEditField] = useState('');
+  const [bulkEditValue, setBulkEditValue] = useState('');
+  const { user } = useContext(AuthContext);
   
   useEffect(() => {
     fetchSuppliers();
   }, []);
   
-  const fetchSuppliers = () => {
-    axios.get('http://localhost:5001/api/suppliers')
-      .then(res => {
-        setSuppliers(res.data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching suppliers:', err);
-        setLoading(false);
-      });
+  const fetchSuppliers = async () => {
+    try {
+      console.log('Fetching suppliers...');
+      const res = await apiCall('/api/suppliers');
+      console.log('Suppliers fetched:', res.data);
+      setSuppliers(res.data);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching suppliers:', err);
+      setMessage('Errore nel caricamento dei fornitori');
+      setLoading(false);
+    }
   };
   
   const handleInputChange = (e) => {
-    setNewSupplier({ ...newSupplier, [e.target.name]: e.target.value });
+    setSupplierForm({ ...supplierForm, [e.target.name]: e.target.value });
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setMessage('');
     
-    axios.post('http://localhost:5001/api/suppliers', newSupplier)
-      .then(res => {
+    try {
+      let response;
+      
+      if (editMode) {
+        // Update existing supplier
+        response = await apiCall(`/api/suppliers/${editingSupplierId}`, 'put', supplierForm);
+        setMessage('Fornitore aggiornato con successo!');
+        setEditMode(false);
+        setEditingSupplierId(null);
+      } else {
+        // Create new supplier
+        response = await apiCall('/api/suppliers', 'post', supplierForm);
         setMessage('Fornitore aggiunto con successo!');
-        setNewSupplier({ name: '', email: '', phone: '', address: '' });
-        fetchSuppliers();
-      })
-      .catch(err => {
-        console.error('Error adding supplier:', err);
-        setMessage('Errore durante l\'aggiunta del fornitore. Riprova.');
+      }
+      
+      // Reset form
+      setSupplierForm({ 
+        name: '', 
+        email: '', 
+        phone: '', 
+        notes: ''
       });
+      
+      // Refresh supplier list
+      fetchSuppliers();
+    } catch (err) {
+      console.error('Error saving supplier:', err);
+      setMessage('Errore durante il salvataggio del fornitore. Riprova.');
+    }
+  };
+  
+  const handleEdit = (supplier) => {
+    setSupplierForm({
+      name: supplier.name,
+      email: supplier.email || '',
+      phone: supplier.phone || '',
+      notes: supplier.notes || ''
+    });
+    setEditMode(true);
+    setEditingSupplierId(supplier._id);
+    
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  
+  const handleCancel = () => {
+    setSupplierForm({ 
+      name: '', 
+      email: '', 
+      phone: '', 
+      notes: ''
+    });
+    setEditMode(false);
+    setEditingSupplierId(null);
+  };
+  
+  const handleDelete = async (supplierId) => {
+    if (window.confirm('Sei sicuro di voler eliminare questo fornitore?')) {
+      try {
+        await apiCall(`/api/suppliers/${supplierId}`, 'delete');
+        setMessage('Fornitore eliminato con successo');
+        fetchSuppliers();
+      } catch (err) {
+        console.error('Error deleting supplier:', err);
+        setMessage('Errore durante l\'eliminazione del fornitore');
+      }
+    }
+  };
+  
+  // Bulk selection handlers
+  const toggleSelectSupplier = (supplierId) => {
+    setSelectedSuppliers(prev => {
+      const updated = { ...prev };
+      updated[supplierId] = !updated[supplierId];
+      return updated;
+    });
+  };
+  
+  const toggleSelectAll = () => {
+    const newSelectAll = !selectAll;
+    setSelectAll(newSelectAll);
+    
+    const newSelectedSuppliers = {};
+    suppliers.forEach(supplier => {
+      newSelectedSuppliers[supplier._id] = newSelectAll;
+    });
+    setSelectedSuppliers(newSelectedSuppliers);
+  };
+  
+  const applySelectionFilter = () => {
+    const newSelectedSuppliers = {};
+    
+    // Reset all selections first
+    suppliers.forEach(supplier => {
+      newSelectedSuppliers[supplier._id] = false;
+    });
+    
+    if (selectionFilter === 'all') {
+      // Select all suppliers
+      suppliers.forEach(supplier => {
+        newSelectedSuppliers[supplier._id] = true;
+      });
+      setSelectAll(true);
+    } else if (selectionFilter === 'withEmail') {
+      // Select suppliers with email
+      suppliers.forEach(supplier => {
+        if (supplier.email && supplier.email.trim() !== '') {
+          newSelectedSuppliers[supplier._id] = true;
+        }
+      });
+      setSelectAll(false);
+    } else if (selectionFilter === 'withoutEmail') {
+      // Select suppliers without email
+      suppliers.forEach(supplier => {
+        if (!supplier.email || supplier.email.trim() === '') {
+          newSelectedSuppliers[supplier._id] = true;
+        }
+      });
+      setSelectAll(false);
+    } else if (selectionFilter === 'withPhone') {
+      // Select suppliers with phone
+      suppliers.forEach(supplier => {
+        if (supplier.phone && supplier.phone.trim() !== '') {
+          newSelectedSuppliers[supplier._id] = true;
+        }
+      });
+      setSelectAll(false);
+    } else if (selectionFilter === 'withoutPhone') {
+      // Select suppliers without phone
+      suppliers.forEach(supplier => {
+        if (!supplier.phone || supplier.phone.trim() === '') {
+          newSelectedSuppliers[supplier._id] = true;
+        }
+      });
+      setSelectAll(false);
+    } else if (selectionFilter === 'search' && searchTerm.trim() !== '') {
+      // Select suppliers matching search term (case insensitive)
+      const term = searchTerm.toLowerCase();
+      suppliers.forEach(supplier => {
+        if (
+          supplier.name.toLowerCase().includes(term) || 
+          (supplier.email && supplier.email.toLowerCase().includes(term)) ||
+          (supplier.phone && supplier.phone.toLowerCase().includes(term)) ||
+          (supplier.notes && supplier.notes.toLowerCase().includes(term))
+        ) {
+          newSelectedSuppliers[supplier._id] = true;
+        }
+      });
+      setSelectAll(false);
+    }
+    
+    setSelectedSuppliers(newSelectedSuppliers);
+  };
+  
+  const handleFilterChange = (e) => {
+    setSelectionFilter(e.target.value);
+    
+    // Reset search term if not in search mode
+    if (e.target.value !== 'search') {
+      setSearchTerm('');
+    }
+  };
+  
+  const getSelectedSupplierIds = () => {
+    return Object.keys(selectedSuppliers).filter(id => selectedSuppliers[id]);
+  };
+  
+  // Bulk actions
+  const handleBulkAction = async () => {
+    const selectedIds = getSelectedSupplierIds();
+    
+    if (selectedIds.length === 0) {
+      setMessage('Nessun fornitore selezionato');
+      return;
+    }
+    
+    try {
+      if (bulkAction === 'delete') {
+        if (window.confirm(`Sei sicuro di voler eliminare ${selectedIds.length} fornitori?`)) {
+          // Delete selected suppliers one by one
+          for (const id of selectedIds) {
+            await apiCall(`/api/suppliers/${id}`, 'delete');
+          }
+          setMessage(`${selectedIds.length} fornitori eliminati con successo`);
+          setSelectedSuppliers({});
+          setSelectAll(false);
+          fetchSuppliers();
+        }
+      } else if (bulkAction === 'edit') {
+        if (!bulkEditField || !bulkEditValue) {
+          setMessage('Seleziona un campo e inserisci un valore');
+          return;
+        }
+        
+        // Update all selected suppliers with the new field value
+        for (const id of selectedIds) {
+          const updateData = { [bulkEditField]: bulkEditValue };
+          await apiCall(`/api/suppliers/${id}`, 'put', updateData);
+        }
+        
+        setMessage(`${selectedIds.length} fornitori aggiornati con successo`);
+        setBulkEditField('');
+        setBulkEditValue('');
+        setSelectedSuppliers({});
+        setSelectAll(false);
+        fetchSuppliers();
+      }
+    } catch (err) {
+      console.error('Error performing bulk action:', err);
+      setMessage('Errore durante l\'esecuzione dell\'azione di massa');
+    }
   };
   
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="text-center my-5"><div className="spinner-border" role="status"></div></div>;
   }
   
   return (
     <div className="row">
       <div className="col-md-6">
-        <div className="card">
-          <div className="card-header bg-success text-white">
-            <h3>Aggiungi Nuovo Fornitore</h3>
+        <div className="card mb-4">
+          <div className={`card-header ${editMode ? 'bg-warning' : 'bg-success'} text-white`}>
+            <h3>{editMode ? 'Modifica Fornitore' : 'Aggiungi Nuovo Fornitore'}</h3>
           </div>
           <div className="card-body">
             {message && (
-              <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-danger'}`}>
+              <div className={`alert ${message.includes('successo') ? 'alert-success' : 'alert-danger'}`}>
                 {message}
               </div>
             )}
@@ -67,7 +289,7 @@ function SupplierManagement() {
                   type="text" 
                   className="form-control" 
                   name="name" 
-                  value={newSupplier.name} 
+                  value={supplierForm.name} 
                   onChange={handleInputChange}
                   required
                 />
@@ -78,63 +300,233 @@ function SupplierManagement() {
                   type="email" 
                   className="form-control" 
                   name="email" 
-                  value={newSupplier.email} 
+                  value={supplierForm.email} 
                   onChange={handleInputChange}
-                  required
                 />
               </div>
               <div className="mb-3">
                 <label className="form-label">Telefono</label>
                 <input 
-                  type="text" 
+                  type="tel" 
                   className="form-control" 
                   name="phone" 
-                  value={newSupplier.phone} 
+                  value={supplierForm.phone} 
                   onChange={handleInputChange}
                 />
               </div>
               <div className="mb-3">
-                <label className="form-label">Indirizzo</label>
+                <label className="form-label">Note</label>
                 <textarea 
                   className="form-control" 
-                  name="address" 
-                  value={newSupplier.address} 
+                  name="notes" 
+                  value={supplierForm.notes} 
                   onChange={handleInputChange}
                 ></textarea>
               </div>
-              <button type="submit" className="btn btn-success">Aggiungi Fornitore</button>
+              <div className="d-flex gap-2">
+                <button type="submit" className={`btn ${editMode ? 'btn-warning' : 'btn-success'}`}>
+                  {editMode ? 'Aggiorna Fornitore' : 'Aggiungi Fornitore'}
+                </button>
+                {editMode && (
+                  <button type="button" className="btn btn-secondary" onClick={handleCancel}>
+                    Annulla
+                  </button>
+                )}
+              </div>
             </form>
           </div>
         </div>
+        
+        {/* Bulk Actions Panel */}
+        {getSelectedSupplierIds().length > 0 && (
+          <div className="card mb-4">
+            <div className="card-header bg-info text-white">
+              <h3>Azioni di Massa ({getSelectedSupplierIds().length} fornitori selezionati)</h3>
+            </div>
+            <div className="card-body">
+              <div className="mb-3">
+                <label className="form-label">Azione di Massa</label>
+                <select
+                  className="form-select"
+                  value={bulkAction}
+                  onChange={(e) => setBulkAction(e.target.value)}
+                >
+                  <option value="">Seleziona un'azione...</option>
+                  <option value="delete">Elimina Fornitori</option>
+                  <option value="edit">Modifica Campo</option>
+                </select>
+              </div>
+              
+              {bulkAction === 'edit' && (
+                <>
+                  <div className="mb-3">
+                    <label className="form-label">Campo da Modificare</label>
+                    <select
+                      className="form-select"
+                      value={bulkEditField}
+                      onChange={(e) => setBulkEditField(e.target.value)}
+                    >
+                      <option value="">Seleziona un campo...</option>
+                      <option value="email">Email</option>
+                      <option value="phone">Telefono</option>
+                      <option value="notes">Note</option>
+                    </select>
+                  </div>
+                  
+                  {(bulkEditField === 'email' || bulkEditField === 'phone') && (
+                    <div className="mb-3">
+                      <label className="form-label">Nuovo Valore</label>
+                      <input
+                        type={bulkEditField === 'email' ? 'email' : 'tel'}
+                        className="form-control"
+                        value={bulkEditValue}
+                        onChange={(e) => setBulkEditValue(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  
+                  {bulkEditField === 'notes' && (
+                    <div className="mb-3">
+                      <label className="form-label">Nuove Note</label>
+                      <textarea
+                        className="form-control"
+                        value={bulkEditValue}
+                        onChange={(e) => setBulkEditValue(e.target.value)}
+                      ></textarea>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              <button
+                className="btn btn-primary"
+                onClick={handleBulkAction}
+                disabled={!bulkAction || (bulkAction === 'edit' && (!bulkEditField || !bulkEditValue))}
+              >
+                Applica a {getSelectedSupplierIds().length} Fornitori
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="col-md-6">
         <div className="card">
           <div className="card-header bg-primary text-white">
             <h3>Lista Fornitori</h3>
+            
+            <div className="mt-3">
+              <div className="row g-3 align-items-center">
+                <div className="col-md-4">
+                  <select
+                    className="form-select"
+                    value={selectionFilter}
+                    onChange={handleFilterChange}
+                  >
+                    <option value="">Seleziona filtro...</option>
+                    <option value="all">Seleziona Tutti</option>
+                    <option value="withEmail">Con Email</option>
+                    <option value="withoutEmail">Senza Email</option>
+                    <option value="withPhone">Con Telefono</option>
+                    <option value="withoutPhone">Senza Telefono</option>
+                    <option value="search">Ricerca</option>
+                  </select>
+                </div>
+                
+                {selectionFilter === 'search' && (
+                  <div className="col-md-5">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Cerca fornitori..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                )}
+                
+                <div className="col">
+                  <button
+                    className="btn btn-light"
+                    onClick={applySelectionFilter}
+                    disabled={
+                      !selectionFilter || 
+                      (selectionFilter === 'search' && !searchTerm.trim())
+                    }
+                  >
+                    Applica Selezione
+                  </button>
+                </div>
+              </div>
+              
+              <div className="form-check mt-2">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  checked={selectAll}
+                  onChange={toggleSelectAll}
+                  id="selectAllSuppliers"
+                />
+                <label className="form-check-label text-white" htmlFor="selectAllSuppliers">
+                  Seleziona/Deseleziona Tutti
+                </label>
+              </div>
+            </div>
           </div>
           <div className="card-body">
             {suppliers.length === 0 ? (
               <p>Nessun fornitore trovato.</p>
             ) : (
-              <table className="table table-striped">
-                <thead>
-                  <tr>
-                    <th>Nome</th>
-                    <th>Email</th>
-                    <th>Telefono</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {suppliers.map(supplier => (
-                    <tr key={supplier._id}>
-                      <td>{supplier.name}</td>
-                      <td>{supplier.email}</td>
-                      <td>{supplier.phone}</td>
+              <div className="table-responsive">
+                <table className="table table-striped">
+                  <thead>
+                    <tr>
+                      <th style={{width: '40px'}}></th>
+                      <th>Nome</th>
+                      <th>Email</th>
+                      <th>Telefono</th>
+                      <th>Azioni</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {suppliers.map(supplier => (
+                      <tr key={supplier._id}>
+                        <td>
+                          <div className="form-check">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              checked={!!selectedSuppliers[supplier._id]}
+                              onChange={() => toggleSelectSupplier(supplier._id)}
+                            />
+                          </div>
+                        </td>
+                        <td>{supplier.name}</td>
+                        <td>{supplier.email || '-'}</td>
+                        <td>{supplier.phone || '-'}</td>
+                        <td>
+                          <div className="btn-group btn-group-sm">
+                            <button
+                              className="btn btn-warning"
+                              onClick={() => handleEdit(supplier)}
+                              title="Modifica"
+                            >
+                              <i className="bi bi-pencil"></i>
+                            </button>
+                            <button
+                              className="btn btn-danger"
+                              onClick={() => handleDelete(supplier._id)}
+                              title="Elimina"
+                            >
+                              <i className="bi bi-trash"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>

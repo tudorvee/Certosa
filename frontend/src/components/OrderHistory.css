@@ -1,0 +1,70 @@
+/* Order History Page Styles */
+
+.date-filter-container {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.order-card {
+  transition: transform 0.2s;
+  margin-bottom: 20px;
+  border-left: 4px solid #17a2b8;
+}
+
+.order-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f8f9fa;
+}
+
+.order-date {
+  font-weight: bold;
+  color: #495057;
+}
+
+.order-badge {
+  display: inline-block;
+  padding: 0.25em 0.6em;
+  font-size: 0.75em;
+  font-weight: 700;
+  border-radius: 0.25rem;
+}
+
+.badge-pending {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.badge-completed {
+  background-color: #28a745;
+  color: #fff;
+}
+
+/* Make tables more compact */
+.order-items-table {
+  font-size: 0.9rem;
+}
+
+.order-items-table th {
+  background-color: #f1f1f1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .date-controls {
+    flex-direction: column;
+  }
+  
+  .date-control-item {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+}

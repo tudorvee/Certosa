@@ -21,6 +21,11 @@ const OrderSchema = new mongoose.Schema({
   status: {
     type: String,
     default: 'pending'
+  },
+  restaurantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Restaurant',
+    required: true
   }
 });
 

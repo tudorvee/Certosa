@@ -1,18 +1,11 @@
 const mongoose = require('mongoose');
 
-const SupplierSchema = new mongoose.Schema({
+const CategorySchema = new mongoose.Schema({
   name: {
     type: String,
     required: true
   },
-  email: {
-    type: String,
-    required: true
-  },
-  phone: {
-    type: String
-  },
-  address: {
+  description: {
     type: String
   },
   restaurantId: {
@@ -20,6 +13,6 @@ const SupplierSchema = new mongoose.Schema({
     ref: 'Restaurant',
     required: true
   }
-});
+}, { timestamps: true });
 
-module.exports = mongoose.model('Supplier', SupplierSchema); 
+module.exports = mongoose.model('Category', CategorySchema); 

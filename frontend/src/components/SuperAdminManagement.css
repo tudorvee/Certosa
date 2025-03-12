@@ -1,0 +1,122 @@
+.super-admin-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.restaurant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.restaurant-card {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  transition: box-shadow 0.3s ease;
+}
+
+.restaurant-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.restaurant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background-color: #f8f9fa;
+  cursor: pointer;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.restaurant-header:hover {
+  background-color: #e9ecef;
+}
+
+.restaurant-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #343a40;
+}
+
+.restaurant-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.restaurant-email {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.restaurant-status {
+  font-size: 0.75rem;
+  padding: 0.25em 0.6em;
+}
+
+.restaurant-users {
+  padding: 20px;
+  background-color: #fff;
+}
+
+.user-table {
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.user-table th {
+  font-weight: 600;
+  background-color: #f1f3f5;
+}
+
+.user-table td {
+  vertical-align: middle;
+}
+
+.password-field {
+  max-width: 200px;
+}
+
+/* Edit form animations */
+.edit-form-enter {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.edit-form-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.edit-form-exit {
+  opacity: 1;
+}
+
+.edit-form-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .restaurant-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .restaurant-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .user-table {
+    font-size: 0.8rem;
+  }
+}
