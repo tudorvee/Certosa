@@ -24,6 +24,9 @@ function SupplierManagement() {
   const [bulkEditField, setBulkEditField] = useState('');
   const [bulkEditValue, setBulkEditValue] = useState('');
   const { user } = useContext(AuthContext);
+  const [lastSelectedSupplierId, setLastSelectedSupplierId] = useState(null);
+  const [inactiveSuppliers, setInactiveSuppliers] = useState([]);
+  const [showInactiveSuppliers, setShowInactiveSuppliers] = useState(false);
   
   useEffect(() => {
     fetchSuppliers();
@@ -31,10 +34,12 @@ function SupplierManagement() {
   
   const fetchSuppliers = async () => {
     try {
-      console.log('Fetching suppliers...');
-      const res = await apiCall('/api/suppliers');
-      console.log('Suppliers fetched:', res.data);
-      setSuppliers(res.data);
+      const res = await apiCall('/api/suppliers?includeInactive=true');
+      
+      // Separate active and inactive suppliers
+      const allSuppliers = res.data;
+      setSuppliers(allSuppliers.filter(supplier => supplier.isActive !== false));
+      setInactiveSuppliers(allSuppliers.filter(supplier => supplier.isActive === false));
       setLoading(false);
     } catch (err) {
       console.error('Error fetching suppliers:', err);
@@ -121,12 +126,50 @@ function SupplierManagement() {
   };
   
   // Bulk selection handlers
-  const toggleSelectSupplier = (supplierId) => {
+  const toggleSelectSupplier = (supplierId, event) => {
+    // Handle keyboard modifiers
+    if (event) {
+      // Control/Command key for toggling individual selections
+      if (event.ctrlKey || event.metaKey) {
+        setSelectedSuppliers(prev => {
+          const updated = { ...prev };
+          updated[supplierId] = !updated[supplierId];
+          return updated;
+        });
+        setLastSelectedSupplierId(supplierId);
+        return;
+      }
+      
+      // Shift key for range selection
+      if (event.shiftKey && lastSelectedSupplierId) {
+        const supplierIds = suppliers.map(supplier => supplier._id);
+        const currentIndex = supplierIds.indexOf(supplierId);
+        const lastIndex = supplierIds.indexOf(lastSelectedSupplierId);
+        
+        if (currentIndex !== -1 && lastIndex !== -1) {
+          const startIndex = Math.min(currentIndex, lastIndex);
+          const endIndex = Math.max(currentIndex, lastIndex);
+          const suppliersInRange = supplierIds.slice(startIndex, endIndex + 1);
+          
+          setSelectedSuppliers(prev => {
+            const updated = { ...prev };
+            suppliersInRange.forEach(id => {
+              updated[id] = true;
+            });
+            return updated;
+          });
+          return;
+        }
+      }
+    }
+    
+    // Default behavior (no modifiers) - toggle single item
     setSelectedSuppliers(prev => {
       const updated = { ...prev };
       updated[supplierId] = !updated[supplierId];
       return updated;
     });
+    setLastSelectedSupplierId(supplierId);
   };
   
   const toggleSelectAll = () => {
@@ -261,6 +304,46 @@ function SupplierManagement() {
     } catch (err) {
       console.error('Error performing bulk action:', err);
       setMessage('Errore durante l\'esecuzione dell\'azione di massa');
+    }
+  };
+  
+  // Add soft delete function
+  const handleSoftDelete = async (supplierId) => {
+    if (window.confirm('Sei sicuro di voler disattivare questo fornitore?')) {
+      try {
+        await apiCall(`/api/suppliers/${supplierId}`, 'put', { isActive: false });
+        setMessage('Fornitore disattivato con successo');
+        fetchSuppliers();
+      } catch (err) {
+        console.error('Error disabling supplier:', err);
+        setMessage('Errore durante la disattivazione del fornitore');
+      }
+    }
+  };
+  
+  // Add restore function
+  const handleRestoreSupplier = async (supplierId) => {
+    try {
+      await apiCall(`/api/suppliers/${supplierId}`, 'put', { isActive: true });
+      setMessage('Fornitore ripristinato con successo');
+      fetchSuppliers();
+    } catch (err) {
+      console.error('Error restoring supplier:', err);
+      setMessage('Errore durante il ripristino del fornitore');
+    }
+  };
+  
+  // Add force delete function
+  const handleForceDelete = async (supplierId) => {
+    if (window.confirm('ATTENZIONE: Questa azione eliminerà definitivamente il fornitore. Procedere?')) {
+      try {
+        await apiCall(`/api/suppliers/${supplierId}/force`, 'delete');
+        setMessage('Fornitore eliminato definitivamente');
+        fetchSuppliers();
+      } catch (err) {
+        console.error('Error force deleting supplier:', err);
+        setMessage('Errore durante l\'eliminazione definitiva');
+      }
     }
   };
   
@@ -490,35 +573,43 @@ function SupplierManagement() {
                   </thead>
                   <tbody>
                     {suppliers.map(supplier => (
-                      <tr key={supplier._id}>
-                        <td>
+                      <tr 
+                        key={supplier._id} 
+                        onClick={(e) => toggleSelectSupplier(supplier._id, e)}
+                        style={{ cursor: 'pointer', backgroundColor: selectedSuppliers[supplier._id] ? '#e9ecef' : 'inherit' }}
+                      >
+                        <td onClick={(e) => e.stopPropagation()}>
                           <div className="form-check">
                             <input
                               className="form-check-input"
                               type="checkbox"
                               checked={!!selectedSuppliers[supplier._id]}
-                              onChange={() => toggleSelectSupplier(supplier._id)}
+                              onChange={(e) => toggleSelectSupplier(supplier._id, e)}
                             />
                           </div>
                         </td>
                         <td>{supplier.name}</td>
                         <td>{supplier.email || '-'}</td>
                         <td>{supplier.phone || '-'}</td>
-                        <td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           <div className="btn-group btn-group-sm">
                             <button
                               className="btn btn-warning"
-                              onClick={() => handleEdit(supplier)}
-                              title="Modifica"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(supplier);
+                              }}
                             >
-                              <i className="bi bi-pencil"></i>
+                              Modifica
                             </button>
                             <button
                               className="btn btn-danger"
-                              onClick={() => handleDelete(supplier._id)}
-                              title="Elimina"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSoftDelete(supplier._id);
+                              }}
                             >
-                              <i className="bi bi-trash"></i>
+                              Disattiva
                             </button>
                           </div>
                         </td>

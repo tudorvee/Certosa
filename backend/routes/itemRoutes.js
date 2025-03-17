@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Item = require('../models/Item');
+const Order = require('../models/Order');
 const auth = require('../middleware/auth');
 const { isAdmin, isKitchen } = require('../middleware/roleAuth');
 const restaurantFilter = require('../middleware/restaurantFilter');
@@ -26,6 +27,12 @@ router.get('/', async (req, res) => {
     
     // Always filter by the restaurant ID
     const query = { restaurantId: req.restaurantId };
+    
+    // Handle the includeInactive parameter
+    if (req.query.includeInactive !== 'true') {
+      // Default behavior: only return active items
+      query.isActive = { $ne: false };
+    }
     
     // Filter by category if provided
     if (req.query.categoryId) {
@@ -79,6 +86,43 @@ router.get('/:id', async (req, res) => {
     res.json(item);
   } catch (err) {
     console.error('Error fetching item:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Check if an item can be deleted
+router.get('/:id/canDelete', isAdmin, async (req, res) => {
+  try {
+    if (!req.restaurantId) {
+      return res.status(400).json({ message: 'Restaurant ID is required' });
+    }
+    
+    // Check if the item exists and belongs to this restaurant
+    const item = await Item.findOne({
+      _id: req.params.id,
+      restaurantId: req.restaurantId
+    });
+    
+    if (!item) {
+      return res.status(404).json({ message: 'Articolo non trovato' });
+    }
+    
+    // Check if the item is referenced in any orders
+    const ordersWithItem = await Order.findOne({
+      'items.itemId': req.params.id,
+      restaurantId: req.restaurantId
+    });
+    
+    if (ordersWithItem) {
+      return res.status(400).json({ 
+        canDelete: false,
+        message: 'Questo articolo è in uso negli ordini e non può essere eliminato'
+      });
+    }
+    
+    res.json({ canDelete: true });
+  } catch (err) {
+    console.error('Error checking if item can be deleted:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -205,6 +249,18 @@ router.delete('/:id', isAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Restaurant ID is required' });
     }
     
+    // Check if the item is referenced in any orders
+    const ordersWithItem = await Order.findOne({
+      'items.itemId': req.params.id,
+      restaurantId: req.restaurantId
+    });
+    
+    if (ordersWithItem) {
+      return res.status(400).json({ 
+        message: 'Questo articolo è in uso negli ordini e non può essere eliminato'
+      });
+    }
+    
     // Ensure we're only deleting items from the current restaurant
     const item = await Item.findOneAndDelete({ 
       _id: req.params.id, 
@@ -218,6 +274,30 @@ router.delete('/:id', isAdmin, async (req, res) => {
     res.json({ message: 'Articolo eliminato con successo' });
   } catch (err) {
     console.error('Error deleting item:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Force delete an item (bypass order checks)
+router.delete('/:id/force', isAdmin, async (req, res) => {
+  try {
+    if (!req.restaurantId) {
+      return res.status(400).json({ message: 'Restaurant ID is required' });
+    }
+    
+    // Delete the item regardless of references
+    const item = await Item.findOneAndDelete({ 
+      _id: req.params.id, 
+      restaurantId: req.restaurantId 
+    });
+    
+    if (!item) {
+      return res.status(404).json({ message: 'Articolo non trovato' });
+    }
+    
+    res.json({ message: 'Articolo eliminato definitivamente con successo' });
+  } catch (err) {
+    console.error('Error force deleting item:', err);
     res.status(500).json({ message: err.message });
   }
 });

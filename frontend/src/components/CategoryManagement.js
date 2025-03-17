@@ -10,6 +10,8 @@ function CategoryManagement() {
   const [editMode, setEditMode] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const { user } = useContext(AuthContext);
+  const [inactiveCategories, setInactiveCategories] = useState([]);
+  const [showInactiveCategories, setShowInactiveCategories] = useState(false);
   
   useEffect(() => {
     fetchCategories();
@@ -17,8 +19,12 @@ function CategoryManagement() {
   
   const fetchCategories = async () => {
     try {
-      const res = await apiCall('/api/categories');
-      setCategories(res.data);
+      const res = await apiCall('/api/categories?includeInactive=true');
+      
+      // Separate active and inactive categories
+      const allCategories = res.data;
+      setCategories(allCategories.filter(category => category.isActive !== false));
+      setInactiveCategories(allCategories.filter(category => category.isActive === false));
       setLoading(false);
     } catch (err) {
       console.error('Error fetching categories:', err);
@@ -87,6 +93,43 @@ function CategoryManagement() {
         console.error('Error deleting category:', err);
         // Display the specific error message from the server
         setMessage(err.response?.data?.message || 'Errore durante l\'eliminazione della categoria');
+      }
+    }
+  };
+  
+  const handleSoftDelete = async (categoryId) => {
+    if (window.confirm('Sei sicuro di voler disattivare questa categoria?')) {
+      try {
+        await apiCall(`/api/categories/${categoryId}`, 'put', { isActive: false });
+        setMessage('Categoria disattivata con successo');
+        fetchCategories();
+      } catch (err) {
+        console.error('Error disabling category:', err);
+        setMessage('Errore durante la disattivazione della categoria');
+      }
+    }
+  };
+  
+  const handleRestoreCategory = async (categoryId) => {
+    try {
+      await apiCall(`/api/categories/${categoryId}`, 'put', { isActive: true });
+      setMessage('Categoria ripristinata con successo');
+      fetchCategories();
+    } catch (err) {
+      console.error('Error restoring category:', err);
+      setMessage('Errore durante il ripristino della categoria');
+    }
+  };
+  
+  const handleForceDelete = async (categoryId) => {
+    if (window.confirm('ATTENZIONE: Questa azione eliminerà definitivamente la categoria. Procedere?')) {
+      try {
+        await apiCall(`/api/categories/${categoryId}/force`, 'delete');
+        setMessage('Categoria eliminata definitivamente');
+        fetchCategories();
+      } catch (err) {
+        console.error('Error force deleting category:', err);
+        setMessage('Errore durante l\'eliminazione definitiva');
       }
     }
   };
