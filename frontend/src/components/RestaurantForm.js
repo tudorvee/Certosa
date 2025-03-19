@@ -35,7 +35,7 @@ function RestaurantForm() {
   
   const fetchRestaurant = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/restaurants/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/restaurants/${id}`);
       setRestaurant(res.data);
       setLoading(false);
     } catch (err) {
@@ -71,23 +71,15 @@ function RestaurantForm() {
     
     try {
       if (isEditing) {
-        await axios.put(`${API_BASE_URL}/api/restaurants/${id}`, restaurant);
+        console.log('Updating restaurant:', restaurant);
+        await axios.put(`${API_BASE_URL}/restaurants/${id}`, restaurant);
         setMessage('Ristorante aggiornato con successo!');
-        
-        // Redirect to dashboard after short delay
-        setTimeout(() => {
-          navigate('/restaurants');
-        }, 1500);
+        navigate('/restaurants');
       } else {
-        // For new restaurants, we'll get back the created users
-        const response = await axios.post(`${API_BASE_URL}/api/restaurants`, restaurant);
-        
-        // Set state for created users
-        setCreatedUsers(response.data.users);
-        
-        setMessage('Ristorante creato con successo! Utenti admin e cucina creati automaticamente.');
-        
-        // Don't redirect immediately so the user can see the created credentials
+        console.log('Creating restaurant:', restaurant);
+        const response = await axios.post(`${API_BASE_URL}/restaurants`, restaurant);
+        setMessage('Ristorante creato con successo!');
+        navigate('/restaurants');
       }
     } catch (err) {
       setMessage(err.response?.data?.message || 'Errore durante il salvataggio');

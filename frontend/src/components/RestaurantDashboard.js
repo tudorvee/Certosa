@@ -16,7 +16,7 @@ function RestaurantDashboard() {
   
   const fetchRestaurants = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/restaurants/all`);
+      const res = await axios.get(`${API_BASE_URL}/restaurants/all`);
       setRestaurants(res.data);
       setLoading(false);
     } catch (err) {
@@ -28,7 +28,7 @@ function RestaurantDashboard() {
   
   const toggleRestaurantStatus = async (id, currentStatus) => {
     try {
-      await axios.patch(`${API_BASE_URL}/api/restaurants/${id}`, {
+      await axios.patch(`${API_BASE_URL}/restaurants/${id}`, {
         active: !currentStatus
       });
       fetchRestaurants();

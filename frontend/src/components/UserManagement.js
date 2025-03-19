@@ -129,7 +129,7 @@ function UserManagement() {
       
       console.log("Creating user with data:", userData);
       
-      await axios.post(`${API_BASE_URL}/api/users`, userData);
+      await axios.post(`${API_BASE_URL}/users`, userData);
       setMessage('Utente aggiunto con successo!');
       
       // Reset the form
@@ -150,7 +150,7 @@ function UserManagement() {
 
   const toggleUserStatus = async (userId, currentStatus) => {
     try {
-      await axios.patch(`${API_BASE_URL}/api/users/${userId}`, {
+      await axios.patch(`${API_BASE_URL}/users/${userId}`, {
         active: !currentStatus
       });
       fetchUsers();

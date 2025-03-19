@@ -23,7 +23,7 @@ function RestaurantSettings() {
       console.log("Fetching restaurant data, user role:", user?.role);
       
       // Determine the API URL
-      let url = `${API_BASE_URL}/api/restaurants/current`;
+      let url = `${API_BASE_URL}/restaurants/current`;
       
       // If superadmin with selected restaurant
       const selectedRestaurant = localStorage.getItem('selectedRestaurant');
@@ -79,7 +79,7 @@ function RestaurantSettings() {
     }
     
     try {
-      await axios.put(`${API_BASE_URL}/api/restaurants/current`, restaurant);
+      await axios.put(`${API_BASE_URL}/restaurants/current`, restaurant);
       setMessage('Impostazioni salvate con successo!');
     } catch (err) {
       setMessage(err.response?.data?.message || 'Errore durante il salvataggio delle impostazioni');
@@ -93,10 +93,10 @@ function RestaurantSettings() {
     
     try {
       // First save any changes to the email configuration
-      await axios.put(`${API_BASE_URL}/api/restaurants/current`, restaurant);
+      await axios.put(`${API_BASE_URL}/restaurants/current`, restaurant);
       
       // Now test the email sending
-      const response = await axios.post(`${API_BASE_URL}/api/orders/test-email`);
+      const response = await axios.post(`${API_BASE_URL}/orders/test-email`);
       console.log('Email test response:', response.data);
       
       if (response.data.success) {
