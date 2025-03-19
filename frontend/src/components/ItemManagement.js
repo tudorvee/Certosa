@@ -785,53 +785,6 @@ function ItemManagement() {
           </div>
         </div>
         
-        <div className="card mt-4">
-          <div className="card-header bg-secondary text-white">
-            <h3>Importazione Lista Articoli</h3>
-          </div>
-          <div className="card-body">
-            <form onSubmit={handleCsvParse}>
-              <div className="mb-3">
-                <label htmlFor="csvFileInput" className="form-label">
-                  File CSV (solo lista nomi)
-                </label>
-                <input
-                  type="file"
-                  className="form-control"
-                  id="csvFileInput"
-                  accept=".csv, .txt"
-                  onChange={(e) => {
-                    if (e.target.files.length > 0) {
-                      setCsvFile(e.target.files[0]);
-                    } else {
-                      setCsvFile(null);
-                    }
-                  }}
-                  ref={fileInputRef}
-                  required
-                />
-                <div className="form-text">
-                  Il file deve contenere solo una colonna con i nomi degli articoli.
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleCsvParse}
-                disabled={!csvFile || loading}
-              >
-                {loading ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Elaborazione...
-                  </>
-                ) : (
-                  'Carica Lista'
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
         
         {/* Bulk Actions Panel */}
         {getSelectedItemIds().length > 0 && (
