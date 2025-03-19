@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }) => {
         // Set auth token header
         axios.defaults.headers.common['x-auth-token'] = token;
         
-        const res = await axios.get(`${API_BASE_URL}/api/auth/user`);
+        const res = await axios.get(`${API_BASE_URL}/auth/user`);
         
         setUser(res.data);
         setIsAuthenticated(true);
@@ -45,7 +45,8 @@ export const AuthProvider = ({ children }) => {
   // Login
   const login = async (email, password) => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/auth/login`, { email, password });
+      console.log('Attempting login with:', { email, API_URL: API_BASE_URL });
+      const res = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
       
       localStorage.setItem('token', res.data.token);
       axios.defaults.headers.common['x-auth-token'] = res.data.token;
@@ -56,6 +57,7 @@ export const AuthProvider = ({ children }) => {
       
       return true;
     } catch (err) {
+      console.error('Login error:', err);
       setError(err.response?.data?.message || 'Login failed');
       return false;
     }
