@@ -44,12 +44,13 @@ async function setupPancrazio() {
     const password = 'password123';
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create a superadmin user (not tied to any specific restaurant)
+    // Create a superadmin user (assigning restaurantId because it's required by the model)
     const superadmin = new User({
       name: 'Super Admin',
       email: 'superadmin@certosa.com',
       password: hashedPassword,
-      role: 'superadmin'
+      role: 'superadmin',
+      restaurantId: restaurant._id
     });
     await superadmin.save();
     console.log(`Superadmin created: ${superadmin.email}`);
