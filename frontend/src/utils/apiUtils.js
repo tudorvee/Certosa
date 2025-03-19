@@ -58,31 +58,34 @@ export const apiCall = async (endpoint, method = 'get', data = null) => {
   if (config.params) console.log('Query params:', config.params);
   if (data) console.log('Request data:', data);
   
+  // Fix for double /api prefix - if endpoint starts with /api, remove it
+  const fixedEndpoint = endpoint.startsWith('/api') ? endpoint.substring(4) : endpoint;
+  
   // Make the API call with the correct configuration
   try {
     let response;
     
     switch (method.toLowerCase()) {
       case 'get':
-        response = await axios.get(`${API_BASE_URL}${endpoint}`, config);
+        response = await axios.get(`${API_BASE_URL}${fixedEndpoint}`, config);
         break;
       case 'post':
-        response = await axios.post(`${API_BASE_URL}${endpoint}`, data, config);
+        response = await axios.post(`${API_BASE_URL}${fixedEndpoint}`, data, config);
         break;
       case 'put':
-        response = await axios.put(`${API_BASE_URL}${endpoint}`, data, config);
+        response = await axios.put(`${API_BASE_URL}${fixedEndpoint}`, data, config);
         break;
       case 'delete':
-        response = await axios.delete(`${API_BASE_URL}${endpoint}`, {
+        response = await axios.delete(`${API_BASE_URL}${fixedEndpoint}`, {
           ...config,
           data
         });
         break;
       case 'patch':
-        response = await axios.patch(`${API_BASE_URL}${endpoint}`, data, config);
+        response = await axios.patch(`${API_BASE_URL}${fixedEndpoint}`, data, config);
         break;
       default:
-        response = await axios.get(`${API_BASE_URL}${endpoint}`, config);
+        response = await axios.get(`${API_BASE_URL}${fixedEndpoint}`, config);
     }
     
     // Log response summary

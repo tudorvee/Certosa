@@ -28,7 +28,7 @@ function Navbar() {
   
   const fetchRestaurants = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/restaurants/all`, {
+      const res = await axios.get(`${API_BASE_URL}/restaurants/all`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

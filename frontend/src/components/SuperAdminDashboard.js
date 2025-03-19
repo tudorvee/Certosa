@@ -19,7 +19,7 @@ function SuperAdminDashboard() {
   
   const fetchStats = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/stats`);
+      const res = await axios.get(`${API_BASE_URL}/stats`);
       setStats(res.data);
       setLoading(false);
     } catch (err) {
