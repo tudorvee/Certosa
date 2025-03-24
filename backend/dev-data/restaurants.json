@@ -1,0 +1,57 @@
+[
+  {
+    "emailConfig": {
+      "senderName": "Ristorante Pancrazio",
+      "senderEmail": "ristorantepancrazio@gmail.com",
+      "smtpHost": "smtp.gmail.com",
+      "smtpPort": 587,
+      "smtpUser": "ristorantepancrazio@gmail.com",
+      "smtpPassword": "xzchhmcbbfxytfxh",
+      "useSsl": false
+    },
+    "_id": "67cdf4a225a87a257b3aefee",
+    "name": "Ristorante Pancrazio",
+    "address": "Via Roma 123, Milano",
+    "phone": "02 1234567",
+    "email": "vlad16518@gmail.com",
+    "active": true,
+    "createdAt": "2025-03-09T20:05:54.313Z",
+    "__v": 0
+  },
+  {
+    "emailConfig": {
+      "senderEmail": "",
+      "senderName": "",
+      "smtpHost": "smtp.gmail.com",
+      "smtpPort": 587,
+      "smtpUser": "",
+      "smtpPassword": "",
+      "useSsl": false
+    },
+    "_id": "67ce051bad63bd47d046523f",
+    "name": "System Administration",
+    "address": "System Address",
+    "active": true,
+    "createdAt": "2025-03-09T21:16:11.941Z",
+    "__v": 0
+  },
+  {
+    "emailConfig": {
+      "senderEmail": "vlad16158@gmail.com",
+      "senderName": "Ristorante Mino",
+      "smtpHost": "smtp.gmail.com",
+      "smtpPort": 587,
+      "smtpUser": "vlad16518@gmail.com",
+      "smtpPassword": "yoardzyerpwreaqo",
+      "useSsl": false
+    },
+    "_id": "67ce07bd1996044853c514cf",
+    "name": "Mino",
+    "address": "Via magenta",
+    "phone": "adsf",
+    "email": "info@mino.it",
+    "active": true,
+    "createdAt": "2025-03-09T21:27:25.010Z",
+    "__v": 0
+  }
+]

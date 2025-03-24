@@ -29,7 +29,7 @@ const emailConfig = {
   smtpHost: 'smtp.gmail.com',
   smtpPort: 587,
   smtpUser: 'ristorantepancrazio@gmail.com',
-  smtpPassword: 'xzchhmcbbfxytfxh',
+  smtpPassword: 'vupobuygcaxwpcjs',  // New App Password
   useSsl: false
 };
 
@@ -37,7 +37,7 @@ const emailConfig = {
 const Restaurant = mongoose.models.Restaurant || mongoose.model('Restaurant', RestaurantSchema);
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect('mongodb://localhost:27017/kitchen-order-app')
   .then(() => {
     console.log('Connected to MongoDB. Updating restaurant email configuration...');
     updateRestaurant();
@@ -66,12 +66,10 @@ async function updateRestaurant() {
     await restaurant.save();
     
     console.log('✅ Email configuration updated successfully!');
-    console.log('New configuration:', emailConfig);
-    
-    // Also update the .env file as a backup
-    console.log('\nDon\'t forget to update your .env file with:');
-    console.log(`EMAIL_USER=${emailConfig.smtpUser}`);
-    console.log(`EMAIL_PASS=${emailConfig.smtpPassword}`);
+    console.log('New configuration:', {
+      ...emailConfig,
+      smtpPassword: '********' // Don't log the actual password
+    });
     
     // Close the connection
     mongoose.connection.close();

@@ -1,14 +1,22 @@
 import React, { useContext, useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axios from 'axios';
 import API_BASE_URL from '../api/index';
+
+// CSS for active nav item
+const activeNavStyle = {
+  fontWeight: 'bold',
+  borderBottom: '3px solid #0d6efd',
+  paddingBottom: '2px'
+};
 
 function Navbar() {
   const { isAuthenticated, user, logout } = useContext(AuthContext);
   const [restaurants, setRestaurants] = useState([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation(); // Get current location/path
   
   // On component mount, check if a restaurant is selected in localStorage
   useEffect(() => {
@@ -71,6 +79,20 @@ function Navbar() {
     window.location.reload();
   };
   
+  // Helper function to check if a path is active
+  const isActive = (path) => {
+    if (path === '/' && location.pathname === '/') {
+      return true;
+    }
+    
+    // Special case for root path
+    if (path === '/' && location.pathname !== '/') {
+      return false;
+    }
+    
+    return location.pathname.startsWith(path);
+  };
+  
   // If not authenticated, show minimal navbar
   if (!isAuthenticated) {
     return (
@@ -107,7 +129,13 @@ function Navbar() {
             {(user.role === 'kitchen' || user.role === 'admin' || 
               (user.role === 'superadmin' && selectedRestaurant)) && (
               <li className="nav-item">
-                <Link className="nav-link" to="/">Nuovo Ordine</Link>
+                <Link 
+                  className="nav-link" 
+                  to="/"
+                  style={isActive('/') ? activeNavStyle : null}
+                >
+                  Nuovo Ordine
+                </Link>
               </li>
             )}
             
@@ -116,22 +144,58 @@ function Navbar() {
                (user.role === 'superadmin' && selectedRestaurant)) && (
               <>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/history">Storico Ordini</Link>
+                  <Link 
+                    className="nav-link" 
+                    to="/history"
+                    style={isActive('/history') ? activeNavStyle : null}
+                  >
+                    Storico Ordini
+                  </Link>
                 </li>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/suppliers">Fornitori</Link>
+                  <Link 
+                    className="nav-link" 
+                    to="/suppliers"
+                    style={isActive('/suppliers') ? activeNavStyle : null}
+                  >
+                    Fornitori
+                  </Link>
                 </li>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/items">Articoli</Link>
+                  <Link 
+                    className="nav-link" 
+                    to="/items"
+                    style={isActive('/items') ? activeNavStyle : null}
+                  >
+                    Articoli
+                  </Link>
                 </li>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/categories">Categorie</Link>
+                  <Link 
+                    className="nav-link" 
+                    to="/categories"
+                    style={isActive('/categories') ? activeNavStyle : null}
+                  >
+                    Categorie
+                  </Link>
                 </li>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/users">Utenti</Link>
+                  <Link 
+                    className="nav-link" 
+                    to="/users"
+                    style={isActive('/users') ? activeNavStyle : null}
+                  >
+                    Utenti
+                  </Link>
                 </li>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/settings">Impostazioni</Link>
+                  <Link 
+                    className="nav-link" 
+                    to="/settings"
+                    style={isActive('/settings') ? activeNavStyle : null}
+                  >
+                    Impostazioni
+                  </Link>
                 </li>
               </>
             )}
@@ -140,13 +204,29 @@ function Navbar() {
             {user && user.role === 'superadmin' && (
               <>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/dashboard">Dashboard</Link>
+                  <Link 
+                    className="nav-link" 
+                    to="/dashboard"
+                    style={isActive('/dashboard') ? activeNavStyle : null}
+                  >
+                    Dashboard
+                  </Link>
                 </li>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/restaurants">Ristoranti</Link>
+                  <Link 
+                    className="nav-link" 
+                    to="/restaurants"
+                    style={isActive('/restaurants') ? activeNavStyle : null}
+                  >
+                    Ristoranti
+                  </Link>
                 </li>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/admin/users">
+                  <Link 
+                    className="nav-link" 
+                    to="/admin/users"
+                    style={isActive('/admin/users') ? activeNavStyle : null}
+                  >
                     <i className="bi bi-people me-1"></i>
                     Gestione Utenti
                   </Link>
