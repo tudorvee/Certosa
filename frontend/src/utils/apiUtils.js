@@ -76,10 +76,15 @@ export const apiCall = async (endpoint, method = 'get', data = null) => {
         response = await axios.put(`${API_BASE_URL}${fixedEndpoint}`, data, config);
         break;
       case 'delete':
-        response = await axios.delete(`${API_BASE_URL}${fixedEndpoint}`, {
-          ...config,
-          data
-        });
+        // Simplified DELETE request - don't send body data for delete requests
+        if (user?.role === 'superadmin' && config.headers['X-Restaurant-ID']) {
+          // For superadmin, we'll use query params instead of body for DELETE
+          config.params = { 
+            ...(config.params || {}), 
+            restaurantId: config.headers['X-Restaurant-ID'] 
+          };
+        }
+        response = await axios.delete(`${API_BASE_URL}${fixedEndpoint}`, config);
         break;
       case 'patch':
         response = await axios.patch(`${API_BASE_URL}${fixedEndpoint}`, data, config);

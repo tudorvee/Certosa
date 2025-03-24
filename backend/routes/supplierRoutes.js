@@ -93,6 +93,9 @@ router.delete('/:id', isAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Restaurant ID is required' });
     }
     
+    console.log('DELETE supplier - params:', req.params);
+    console.log('DELETE supplier - restaurant ID:', req.restaurantId);
+    
     // Ensure we're only deleting suppliers from the current restaurant
     const supplier = await Supplier.findOneAndDelete({ 
       _id: req.params.id, 
