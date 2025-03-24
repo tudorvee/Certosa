@@ -1,0 +1,65 @@
+[
+  {
+    "_id": "67d0196135fdc8732b1d9fa8",
+    "name": "Carne",
+    "description": "",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "createdAt": "2025-03-11T11:07:13.299Z",
+    "updatedAt": "2025-03-11T16:37:35.016Z",
+    "__v": 0
+  },
+  {
+    "_id": "67d0196735fdc8732b1d9fab",
+    "name": "Latticini",
+    "description": "",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "createdAt": "2025-03-11T11:07:19.651Z",
+    "updatedAt": "2025-03-11T11:07:19.651Z",
+    "__v": 0
+  },
+  {
+    "_id": "67d0196b35fdc8732b1d9fae",
+    "name": "Pasta",
+    "description": "",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "createdAt": "2025-03-11T11:07:23.623Z",
+    "updatedAt": "2025-03-11T11:07:23.623Z",
+    "__v": 0
+  },
+  {
+    "_id": "67d0196f35fdc8732b1d9fb1",
+    "name": "Bevande",
+    "description": "",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "createdAt": "2025-03-11T11:07:27.418Z",
+    "updatedAt": "2025-03-11T11:07:27.418Z",
+    "__v": 0
+  },
+  {
+    "_id": "67d0197535fdc8732b1d9fb4",
+    "name": "Frutta",
+    "description": "",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "createdAt": "2025-03-11T11:07:33.588Z",
+    "updatedAt": "2025-03-11T11:07:33.588Z",
+    "__v": 0
+  },
+  {
+    "_id": "67d026bd35fdc8732b1da2b5",
+    "name": "Dolci",
+    "description": "Dolci",
+    "restaurantId": "67ce07bd1996044853c514cf",
+    "createdAt": "2025-03-11T12:04:13.249Z",
+    "updatedAt": "2025-03-11T12:04:13.249Z",
+    "__v": 0
+  },
+  {
+    "_id": "67d1adc2551c15248c4c578f",
+    "name": "Nuovo Articolo",
+    "description": "",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "createdAt": "2025-03-12T15:52:34.769Z",
+    "updatedAt": "2025-03-12T15:52:34.769Z",
+    "__v": 0
+  }
+]

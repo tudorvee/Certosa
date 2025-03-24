@@ -57,6 +57,61 @@
   background-color: #f1f1f1;
 }
 
+/* Supplier Notes Section */
+.supplier-notes-section {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 15px;
+  border-top: 1px solid #dee2e6;
+}
+
+.notes-heading {
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  color: #495057;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.notes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.supplier-note-card {
+  background-color: #fff;
+  border-radius: 6px;
+  border-left: 4px solid #6c757d;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.supplier-note-header {
+  background-color: #e9ecef;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+.supplier-note-content {
+  padding: 12px;
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+/* CSV Export Button */
+.btn-export-csv {
+  background-color: #28a745;
+  color: white;
+  border: none;
+}
+
+.btn-export-csv:hover {
+  background-color: #218838;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .date-controls {
@@ -66,5 +121,9 @@
   .date-control-item {
     width: 100%;
     margin-bottom: 10px;
+  }
+  
+  .supplier-note-card {
+    width: 100%;
   }
 }

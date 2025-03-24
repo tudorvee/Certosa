@@ -26,6 +26,12 @@ const OrderSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Restaurant',
     required: true
+  },
+  supplierNotes: {
+    type: Map,
+    of: String,
+    default: new Map(),
+    description: "Notes for each supplier, keyed by supplier ID"
   }
 });
 

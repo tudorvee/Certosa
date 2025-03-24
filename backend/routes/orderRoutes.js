@@ -9,6 +9,67 @@ const auth = require('../middleware/auth');
 const { isKitchen } = require('../middleware/roleAuth');
 const restaurantFilter = require('../middleware/restaurantFilter');
 
+// EMERGENCY TEST ROUTE - REMOVE AFTER DEBUGGING
+// This must be before the middleware to bypass auth
+router.post('/emergency-test-note', async (req, res) => {
+  try {
+    console.log('EMERGENCY TEST: Testing note email functionality');
+    console.log('Request body:', req.body);
+    
+    // Find a restaurant with email config
+    const restaurant = await Restaurant.findOne({ 'emailConfig.senderEmail': { $exists: true } });
+    if (!restaurant) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No restaurant with email configuration found'
+      });
+    }
+    
+    // Find a supplier
+    const supplier = await Supplier.findOne({ restaurantId: restaurant._id });
+    if (!supplier || !supplier.email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No supplier with email found'
+      });
+    }
+    
+    // Generate test HTML directly
+    const testHtml = `
+      <h2>EMERGENCY TEST Email</h2>
+      <p>This is a direct test of the email system with notes.</p>
+      <div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #0d6efd;">
+        <p><strong>Test Note:</strong></p>
+        <p>${req.body.note || "Default test note - no note was provided in the request"}</p>
+      </div>
+      <p>Timestamp: ${new Date().toISOString()}</p>
+      <p>Test ID: ${Math.random().toString(36).substring(2, 15)}</p>
+    `;
+    
+    const transporter = await emailService.getTransporter(restaurant._id);
+    const info = await transporter.sendMail({
+      from: `"${restaurant.emailConfig.senderName}" <${restaurant.emailConfig.senderEmail}>`,
+      to: supplier.email,
+      subject: 'EMERGENCY TEST Email with Note',
+      html: testHtml
+    });
+    
+    res.json({ 
+      success: true, 
+      message: 'Emergency test email sent', 
+      to: supplier.email,
+      messageId: info.messageId,
+      emailContent: testHtml
+    });
+  } catch (err) {
+    console.error('Error in emergency test:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: err.message 
+    });
+  }
+});
+
 // Apply auth and middleware to all routes
 router.use(auth);
 router.use(restaurantFilter);
@@ -35,6 +96,28 @@ router.get('/', isKitchen, async (req, res) => {
 router.post('/test-email', isKitchen, async (req, res) => {
   try {
     console.log('Testing email configuration for restaurant:', req.restaurantId);
+    
+    // Get restaurant info first
+    const restaurant = await Restaurant.findById(req.restaurantId);
+    if (!restaurant) {
+      console.error('Restaurant not found:', req.restaurantId);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Restaurant not found',
+        error: 'Restaurant configuration not found'
+      });
+    }
+    
+    console.log('Found restaurant:', restaurant.name);
+    console.log('Email config:', {
+      senderName: restaurant.emailConfig?.senderName,
+      senderEmail: restaurant.emailConfig?.senderEmail,
+      smtpHost: restaurant.emailConfig?.smtpHost,
+      smtpPort: restaurant.emailConfig?.smtpPort,
+      smtpUser: restaurant.emailConfig?.smtpUser,
+      useSsl: restaurant.emailConfig?.useSsl
+    });
+    
     const result = await emailService.sendTestEmail(req.restaurantId);
     
     if (result.success) {
@@ -70,6 +153,9 @@ router.post('/', isKitchen, async (req, res) => {
     
     // Get restaurant info
     console.log('Creating order for restaurant:', req.restaurantId);
+    console.log('Full request body:', req.body); // Log the entire request body
+    console.log('Supplier notes from request:', req.body.supplierNotes); // Log just the notes
+    
     const restaurant = await Restaurant.findById(req.restaurantId);
     if (!restaurant) {
       return res.status(400).json({ message: 'Ristorante non trovato' });
@@ -78,12 +164,17 @@ router.post('/', isKitchen, async (req, res) => {
     // Create the order with restaurant ID
     const order = new Order({
       items: req.body.items,
-      restaurantId: req.restaurantId
+      restaurantId: req.restaurantId,
+      supplierNotes: req.body.supplierNotes || {}
     });
     
     // Save the order first
     const savedOrder = await order.save();
     console.log('Order saved to database:', savedOrder._id);
+    console.log('Saved order details:', {
+      items: savedOrder.items,
+      supplierNotes: savedOrder.supplierNotes
+    });
     
     // Group items by supplier
     const supplierItems = {};
@@ -134,12 +225,34 @@ router.post('/', isKitchen, async (req, res) => {
       
       try {
         console.log(`Sending email to supplier ${supplier.name} <${supplier.email}>`);
-        const emailResult = await emailService.sendEmail(supplier.email, items, req.restaurantId);
+        console.log('Supplier ID:', supplierId);
         
-        if (emailResult.success) {
-          console.log(`Email sent to ${supplier.name} with message ID: ${emailResult.messageId}`);
-        } else {
-          throw new Error('Email sending failed');
+        // Get the note for this supplier
+        let supplierNote = null;
+        if (req.body.supplierNotes && typeof req.body.supplierNotes === 'object') {
+          supplierNote = req.body.supplierNotes[supplierId];
+          console.log('Found note for supplier:', supplierNote);
+        }
+        
+        // Use the emailService to send the email
+        try {
+          console.log(`Using emailService to send email to ${supplier.name} <${supplier.email}>`);
+          
+          const emailResult = await emailService.sendEmail(
+            supplier.email,
+            items,
+            req.restaurantId,
+            supplierNote
+          );
+          
+          if (emailResult.success) {
+            console.log(`Email sent successfully to ${supplier.name} with messageId: ${emailResult.messageId}`);
+          } else {
+            throw new Error(`Failed to send email: ${emailResult.error}`);
+          }
+        } catch (emailErr) {
+          console.error(`Error sending email to ${supplier.email}:`, emailErr);
+          emailErrors.push(`Errore nell'invio dell'email a ${supplier.name}: ${emailErr.message}`);
         }
       } catch (err) {
         console.error(`Error sending email to ${supplier.email}:`, err);
@@ -165,6 +278,128 @@ router.post('/', isKitchen, async (req, res) => {
   } catch (err) {
     console.error('Error creating order:', err);
     res.status(400).json({ message: err.message });
+  }
+});
+
+// Add a new test route for notes
+router.post('/test-note-email', isKitchen, async (req, res) => {
+  try {
+    console.log('Testing note email functionality for restaurant:', req.restaurantId);
+    console.log('Request body:', req.body);
+    
+    // Get supplier to send to
+    const supplier = await Supplier.findOne({ restaurantId: req.restaurantId });
+    if (!supplier || !supplier.email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No supplier with email found'
+      });
+    }
+    
+    // Send test email with note
+    const result = await emailService.sendBasicEmail(
+      supplier.email,
+      req.restaurantId,
+      req.body.note || "Questa è una nota di test!"
+    );
+    
+    if (result.success) {
+      res.json({ 
+        success: true, 
+        message: 'Test email with note sent successfully', 
+        messageId: result.messageId,
+        supplierEmail: supplier.email
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Test email with note failed', 
+        error: result.error 
+      });
+    }
+  } catch (err) {
+    console.error('Error testing note email:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error testing note email', 
+      error: err.message 
+    });
+  }
+});
+
+// Simplified emergency note test
+router.post('/emergency-note', isKitchen, async (req, res) => {
+  try {
+    console.log('🔴 DIRECT TEST: Testing note email with simplified approach');
+    console.log('Request body:', req.body);
+    
+    // Find a supplier to send to
+    const supplier = await Supplier.findOne({ restaurantId: req.restaurantId });
+    if (!supplier || !supplier.email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No supplier with email found for this restaurant'
+      });
+    }
+    
+    // Get restaurant info
+    const restaurant = await Restaurant.findById(req.restaurantId);
+    if (!restaurant) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Restaurant not found' 
+      });
+    }
+    
+    // Create email content
+    const noteText = req.body.note || "This is a default test note";
+    const htmlContent = `
+      <h2>TEST EMAIL - Verifica Note</h2>
+      <p>Questo è un test per la funzionalità delle note negli ordini.</p>
+      <hr>
+      <div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #0d6efd;">
+        <p><strong>Nota di Test:</strong></p>
+        <p>${noteText}</p>
+      </div>
+      <hr>
+      <p>Timestamp: ${new Date().toISOString()}</p>
+      <p>Ristorante: ${restaurant.name}</p>
+    `;
+    
+    // Create nodemailer transporter
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER || restaurant.emailConfig.senderEmail,
+        pass: process.env.EMAIL_PASS || restaurant.emailConfig.smtpPassword
+      }
+    });
+    
+    // Send email
+    console.log(`Sending test email to ${supplier.email}`);
+    const info = await transporter.sendMail({
+      from: `"${restaurant.name} - TEST" <${restaurant.emailConfig.senderEmail}>`,
+      to: supplier.email,
+      subject: 'TEST - Verifica Note Ordini',
+      html: htmlContent
+    });
+    
+    console.log('Email sent:', info.messageId);
+    
+    // Return success
+    res.json({
+      success: true,
+      message: 'Test email sent successfully',
+      to: supplier.email,
+      messageId: info.messageId
+    });
+  } catch (error) {
+    console.error('Error sending test email:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Unknown error sending test email'
+    });
   }
 });
 

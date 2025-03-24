@@ -279,8 +279,10 @@ router.delete('/:id', isAdmin, async (req, res) => {
 });
 
 // Force delete an item (bypass order checks)
-router.delete('/:id/force', isAdmin, async (req, res) => {
+router.delete('/:id/force-delete', isAdmin, async (req, res) => {
   try {
+    console.log(`Force delete request for item: ${req.params.id}`);
+    
     if (!req.restaurantId) {
       return res.status(400).json({ message: 'Restaurant ID is required' });
     }
@@ -292,12 +294,84 @@ router.delete('/:id/force', isAdmin, async (req, res) => {
     });
     
     if (!item) {
+      console.log(`Item not found: ${req.params.id}`);
       return res.status(404).json({ message: 'Articolo non trovato' });
     }
     
+    console.log(`Item force deleted successfully: ${req.params.id}`);
     res.json({ message: 'Articolo eliminato definitivamente con successo' });
   } catch (err) {
     console.error('Error force deleting item:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Soft-delete an item (mark as inactive)
+router.put('/:id/soft-delete', isAdmin, async (req, res) => {
+  try {
+    console.log(`Soft-delete request for item: ${req.params.id}`);
+    
+    if (!req.restaurantId) {
+      return res.status(400).json({ message: 'Restaurant ID is required' });
+    }
+    
+    // Mark the item as inactive instead of deleting it
+    const item = await Item.findOneAndUpdate(
+      { 
+        _id: req.params.id, 
+        restaurantId: req.restaurantId 
+      },
+      { isActive: false },
+      { new: true }
+    );
+    
+    if (!item) {
+      console.log(`Item not found: ${req.params.id}`);
+      return res.status(404).json({ message: 'Articolo non trovato' });
+    }
+    
+    console.log(`Item soft-deleted successfully: ${req.params.id}`);
+    res.json({ 
+      message: 'Articolo disattivato con successo', 
+      item 
+    });
+  } catch (err) {
+    console.error('Error soft-deleting item:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Restore a soft-deleted item
+router.put('/:id/restore', isAdmin, async (req, res) => {
+  try {
+    console.log(`Restore request for item: ${req.params.id}`);
+    
+    if (!req.restaurantId) {
+      return res.status(400).json({ message: 'Restaurant ID is required' });
+    }
+    
+    // Mark the item as active again
+    const item = await Item.findOneAndUpdate(
+      { 
+        _id: req.params.id, 
+        restaurantId: req.restaurantId 
+      },
+      { isActive: true },
+      { new: true }
+    );
+    
+    if (!item) {
+      console.log(`Item not found: ${req.params.id}`);
+      return res.status(404).json({ message: 'Articolo non trovato' });
+    }
+    
+    console.log(`Item restored successfully: ${req.params.id}`);
+    res.json({ 
+      message: 'Articolo ripristinato con successo', 
+      item 
+    });
+  } catch (err) {
+    console.error('Error restoring item:', err);
     res.status(500).json({ message: err.message });
   }
 });

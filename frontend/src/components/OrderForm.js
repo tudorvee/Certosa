@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../api/index';
 import { apiCall } from '../utils/apiUtils';
@@ -14,10 +14,142 @@ function OrderForm() {
   const [filter, setFilter] = useState('all');
   const [selectedItems, setSelectedItems] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [supplierNotes, setSupplierNotes] = useState({});  // Add state for supplier notes
+  const [expandedSuppliers, setExpandedSuppliers] = useState(new Set());  // Track which suppliers have expanded notes
+  const [isDragging, setIsDragging] = useState(false);
+  const leftPanelRef = useRef(null);
+  const rightPanelRef = useRef(null);
+  const initialMousePos = useRef(0);
+  const initialLeftWidth = useRef(0);
+  const orderButtonContainerRef = useRef(null);
   
   useEffect(() => {
     fetchData();
   }, []);
+  
+  // Add a function to update button width
+  const updateButtonPosition = useCallback(() => {
+    if (rightPanelRef.current && orderButtonContainerRef.current) {
+      const rightPanelRect = rightPanelRef.current.getBoundingClientRect();
+      
+      // Get the width - ensure minimum of 250px
+      const buttonWidth = Math.max(250, rightPanelRect.width);
+      
+      // Set width and position without any delay
+      orderButtonContainerRef.current.style.width = `${buttonWidth}px`;
+      
+      // Position from the right edge of the screen
+      const rightOffset = window.innerWidth - (rightPanelRect.left + rightPanelRect.width);
+      orderButtonContainerRef.current.style.right = `${rightOffset}px`;
+    }
+  }, []);
+  
+  // Update button position when resizing
+  useEffect(() => {
+    // Initial positioning
+    updateButtonPosition();
+    
+    // Set up resize observer to update button position when cart size changes
+    const resizeObserver = new ResizeObserver(() => {
+      updateButtonPosition();
+    });
+    
+    if (rightPanelRef.current) {
+      resizeObserver.observe(rightPanelRef.current);
+    }
+    
+    // Also listen to window resize events
+    window.addEventListener('resize', updateButtonPosition);
+    
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateButtonPosition);
+    };
+  }, [updateButtonPosition]);
+
+  // Create updateRightPanel function to avoid circular dependency
+  const updateRightPanel = useCallback((newLeftWidth) => {
+    if (rightPanelRef.current) {
+      rightPanelRef.current.style.width = `calc(100% - ${newLeftWidth}px)`;
+      rightPanelRef.current.style.flex = 'none';
+      
+      // Update the button position directly here for immediate response
+      if (orderButtonContainerRef.current) {
+        // Get updated right panel position after width change
+        const rightPanelRect = rightPanelRef.current.getBoundingClientRect();
+        
+        // Get the width - ensure minimum of 250px
+        const buttonWidth = Math.max(250, rightPanelRect.width);
+        
+        // Set width and position without any delay
+        orderButtonContainerRef.current.style.width = `${buttonWidth}px`;
+        
+        // Position from the right edge of the screen
+        const rightOffset = window.innerWidth - (rightPanelRect.left + rightPanelRect.width);
+        orderButtonContainerRef.current.style.right = `${rightOffset}px`;
+      }
+    }
+  }, []);
+  
+  // Update panel movement without circular dependency
+  const handleMouseMove = useCallback((e) => {
+    if (!isDragging) return;
+    
+    const deltaX = e.clientX - initialMousePos.current;
+    const newLeftWidth = initialLeftWidth.current + deltaX;
+    
+    // Set minimum and maximum widths
+    const minLeftWidth = 200; // Minimum width for left panel (in pixels)
+    const maxLeftWidth = window.innerWidth - 220; // Maximum width, leaving 220px for right panel
+    
+    if (newLeftWidth >= minLeftWidth && newLeftWidth <= maxLeftWidth && leftPanelRef.current) {
+      leftPanelRef.current.style.width = `${newLeftWidth}px`;
+      leftPanelRef.current.style.flex = 'none';
+      
+      // Adjust the right panel to take remaining space
+      updateRightPanel(newLeftWidth);
+    }
+  }, [isDragging, updateRightPanel]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    
+    // Remove resizing class from body
+    document.body.classList.remove('resizing');
+    
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  }, []); // Using empty dependencies to avoid circular dependency
+
+  // Need to use useEffect to handle the circular dependency
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault();
+    setIsDragging(true);
+    initialMousePos.current = e.clientX;
+    
+    if (leftPanelRef.current) {
+      initialLeftWidth.current = leftPanelRef.current.getBoundingClientRect().width;
+    }
+    
+    // Add resizing class to body
+    document.body.classList.add('resizing');
+    
+    // Event listeners are now added in the useEffect
+  }, []);
+  
+  // The cleanup useEffect is now combined with the one above
   
   const fetchData = async () => {
     try {
@@ -96,14 +228,42 @@ function OrderForm() {
     });
   };
   
+  // Group items by supplier
+  const itemsBySupplier = useMemo(() => {
+    return items.reduce((acc, item) => {
+      if (item.supplierId) {
+        const supplierId = item.supplierId._id;
+        if (!acc[supplierId]) {
+          acc[supplierId] = {
+            supplier: item.supplierId,
+            items: []
+          };
+        }
+        acc[supplierId].items.push(item);
+      }
+      return acc;
+    }, {});
+  }, [items]);
+  
+  // Handle note change for a supplier
+  const handleNoteChange = (supplierId, note) => {
+    console.log('Setting note for supplier:', supplierId, note);
+    setSupplierNotes(prev => ({
+      ...prev,
+      [supplierId]: note
+    }));
+  };
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
     
-    const orderItems = Object.values(selectedItems).map(item => ({
-      itemId: item.id,
-      quantity: item.quantity
-    }));
+    const orderItems = Object.entries(selectedItems)
+      .filter(([_, itemData]) => itemData.quantity > 0)
+      .map(([itemId, itemData]) => ({
+        itemId: itemId,
+        quantity: itemData.quantity
+      }));
     
     if (orderItems.length === 0) {
       setMessage('Seleziona almeno un articolo');
@@ -112,11 +272,38 @@ function OrderForm() {
     
     try {
       console.log('Submitting order with items:', orderItems);
-      const response = await apiCall('/api/orders', 'post', { items: orderItems });
-      console.log('Order submitted successfully:', response.data);
       
+      // Create a clean object of supplier notes for only suppliers with items in this order
+      const notesForOrder = {};
+      
+      // First find which suppliers are in this order
+      const supplierIds = new Set();
+      for (const orderItem of orderItems) {
+        const item = items.find(i => i._id === orderItem.itemId);
+        if (item && item.supplierId) {
+          supplierIds.add(item.supplierId._id);
+        }
+      }
+      
+      // Then only include notes for those suppliers
+      for (const supplierId of supplierIds) {
+        const note = supplierNotes[supplierId];
+        if (note && note.trim()) {
+          notesForOrder[supplierId] = note.trim();
+        }
+      }
+      
+      console.log('Notes being sent with order:', notesForOrder);
+      
+      const response = await apiCall('/api/orders', 'POST', { 
+        items: orderItems,
+        supplierNotes: notesForOrder
+      });
+      
+      console.log('Order submitted successfully:', response.data);
       setMessage('Ordine inviato con successo! Le email sono state inviate ai fornitori.');
       setSelectedItems({});
+      setSupplierNotes({});  // Clear notes after successful submission
     } catch (err) {
       console.error('Error creating order:', err);
       
@@ -126,7 +313,24 @@ function OrderForm() {
     }
   };
   
-  // Get unique supplier colors
+  // Get unique category colors for item cards
+  const getCategoryColor = (categoryId) => {
+    const colors = [
+      '#ffcccb', // Light red
+      '#c1e1c1', // Light green
+      '#c4c3d0', // Light purple
+      '#ffe4c4', // Light orange
+      '#87cefa', // Light blue
+      '#e6e6fa'  // Lavender
+    ];
+    
+    if (!categoryId) return '#ffffff'; // White for items with no category
+    
+    const categoryIndex = categories.findIndex(c => c._id === categoryId);
+    return categoryIndex >= 0 ? colors[categoryIndex % colors.length] : '#ffffff';
+  };
+  
+  // Get unique supplier colors for supplier headers
   const getSupplierColor = (supplierId) => {
     const colors = [
       '#ffcccb', // Light red
@@ -171,22 +375,65 @@ function OrderForm() {
     return filteredItems;
   };
   
-  // Add a new function to test email configuration
-  const testEmailConfig = async () => {
-    setMessage('');
+  // Add a new function to test email
+  const handleTestEmail = async () => {
     try {
-      console.log('Testing email configuration...');
-      const response = await apiCall('/api/orders/test-email', 'post');
-      console.log('Email test response:', response.data);
+      setMessage('');
+      setLoading(true);
+      const response = await apiCall('/api/orders/test-email', 'POST', {});  // Add empty object as body
       
       if (response.data.success) {
-        setMessage('Email di test inviata con successo! Controlla la tua casella di posta.');
+        setMessage('Email di test inviata con successo!');
       } else {
-        setMessage(`Errore nell'invio dell'email di test: ${response.data.error}`);
+        setMessage('Errore nell\'invio dell\'email di test: ' + response.data.error);
       }
-    } catch (err) {
-      console.error('Error testing email:', err);
-      setMessage(`Errore nel test email: ${err.response?.data?.error || err.message}`);
+    } catch (error) {
+      console.error('Error testing email:', error);
+      setMessage('Errore nell\'invio dell\'email di test: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Add a new function to test email with notes
+  const handleTestNoteEmail = async () => {
+    try {
+      setMessage('');
+      setLoading(true);
+      
+      // Get the first supplier that has a note
+      let testNote = '';
+      let testSupplierId = '';
+      for (const [supplierId, note] of Object.entries(supplierNotes)) {
+        if (note && note.trim()) {
+          testNote = note;
+          testSupplierId = supplierId;
+          break;
+        }
+      }
+      
+      // If no note found, use a default one
+      if (!testNote) {
+        testNote = 'Questa è una nota di test per verificare il funzionamento delle note nelle email!';
+      }
+      
+      console.log('Sending test note email with note:', testNote);
+      
+      const response = await apiCall('/api/orders/test-note-email', 'POST', {
+        note: testNote,
+        supplierId: testSupplierId
+      });
+      
+      if (response.data.success) {
+        setMessage(`Email di test con nota inviata con successo a ${response.data.supplierEmail}!`);
+      } else {
+        setMessage('Errore nell\'invio dell\'email di test con nota: ' + response.data.error);
+      }
+    } catch (error) {
+      console.error('Error testing note email:', error);
+      setMessage('Errore nell\'invio dell\'email di test con nota: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -195,244 +442,377 @@ function OrderForm() {
     setSearchTerm(e.target.value);
   };
   
+  // Add function to toggle supplier note visibility
+  const toggleSupplierNote = (supplierId) => {
+    setExpandedSuppliers(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(supplierId)) {
+        newExpanded.delete(supplierId);
+      } else {
+        newExpanded.add(supplierId);
+      }
+      return newExpanded;
+    });
+  };
+  
+  // Add emergency test function
+  const handleEmergencyTest = async () => {
+    try {
+      setMessage('');
+      setLoading(true);
+      
+      // Use a default test note if none is provided
+      const testNote = "EMERGENCY TEST NOTE - PLEASE VERIFY THIS NOTE APPEARS IN THE EMAIL";
+      
+      console.log('EMERGENCY TEST: Sending direct test email with note:', testNote);
+      
+      // Use apiCall instead of fetch for consistency
+      const response = await apiCall('/api/orders/emergency-note', 'POST', { 
+        note: testNote 
+      });
+      
+      if (response.data.success) {
+        setMessage(`EMERGENCY TEST: Email sent to ${response.data.to}! Check if the note appears in the email.`);
+      } else {
+        setMessage('EMERGENCY TEST FAILED: ' + response.data.error);
+      }
+    } catch (error) {
+      console.error('Emergency test failed:', error);
+      setMessage('EMERGENCY TEST FAILED: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Add a function to test a complete order with notes
+  const handleDirectOrderTest = async () => {
+    try {
+      setMessage('');
+      setLoading(true);
+      
+      // Find a supplier
+      if (suppliers.length === 0) {
+        setMessage('No suppliers found. Please add suppliers first.');
+        return;
+      }
+      
+      const testSupplier = suppliers[0]; // Get the first supplier
+      const testNote = "TEST NOTE for direct order test: Please verify this note appears in the email.";
+      
+      // Find an item from this supplier
+      const supplierItems = items.filter(item => 
+        item.supplierId && item.supplierId._id === testSupplier._id
+      );
+      
+      if (supplierItems.length === 0) {
+        setMessage('No items found for supplier ' + testSupplier.name);
+        return;
+      }
+      
+      const testItem = supplierItems[0]; // Get the first item
+      
+      // Create a test order with just this item
+      const orderData = {
+        items: [
+          {
+            itemId: testItem._id,
+            quantity: 1
+          }
+        ],
+        supplierNotes: {
+          [testSupplier._id]: testNote
+        }
+      };
+      
+      console.log('Sending direct test order:', orderData);
+      
+      const response = await apiCall('/api/orders', 'POST', orderData);
+      
+      setMessage('Test order sent successfully! Check if the note appears in the email sent to ' + testSupplier.email);
+      console.log('Order response:', response.data);
+      
+    } catch (error) {
+      console.error('Direct order test failed:', error);
+      setMessage('Direct order test failed: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   if (loading) {
-    return <div className="text-center my-5"><div className="spinner-border" role="status"></div></div>;
+    return <div className="text-center my-3"><div className="spinner-border" role="status"></div></div>;
   }
   
   return (
     <div className="order-form-container">
-      <div className="card mb-4">
-        <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-          <h3>Nuovo Ordine</h3>
-          <button 
-            type="button" 
-            className="btn btn-outline-light btn-sm" 
-            onClick={testEmailConfig}
-          >
-            Testa Email
-          </button>
+      {message && (
+        <div className={`alert ${message.includes('successo') ? 'alert-success' : 'alert-danger'} m-1 py-2`}>
+          {message}
         </div>
-        <div className="card-body">
-          {message && (
-            <div className={`alert ${message.includes('successo') ? 'alert-success' : 'alert-danger'}`}>
-              {message}
+      )}
+      
+      <div className="order-content">
+        {/* Left Column - Items */}
+        <div className="items-section" ref={leftPanelRef}>
+          <div className="filter-bar">
+            {/* Filter Controls */}
+            <div className="mb-2">
+              <div className="d-flex align-items-center mb-1">
+                <button 
+                  className={`btn btn-sm ${filterType === 'supplier' ? 'btn-primary' : 'btn-outline-primary'} me-1`}
+                  onClick={() => handleFilterTypeChange('supplier')}
+                >
+                  Filtra per Fornitore
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterType === 'category' ? 'btn-primary' : 'btn-outline-primary'} me-1`}
+                  onClick={() => handleFilterTypeChange('category')}
+                >
+                  Filtra per Categoria
+                </button>
+              </div>
+              
+              {filterType === 'supplier' ? (
+                <div className="btn-group mb-2 flex-wrap" role="group">
+                  <button
+                    className={`btn btn-sm ${filter === 'all' ? 'btn-success' : 'btn-outline-success'}`}
+                    onClick={() => setFilter('all')}
+                  >
+                    Tutti
+                  </button>
+                  {suppliers.map(supplier => (
+                    <button
+                      key={supplier._id}
+                      className={`btn btn-sm ${filter === supplier._id ? 'btn-success' : 'btn-outline-success'} text-truncate`}
+                      onClick={() => setFilter(supplier._id)}
+                      style={{ 
+                        borderLeft: `3px solid ${getSupplierColor(supplier._id)}`,
+                        borderTopLeftRadius: 0,
+                        borderBottomLeftRadius: 0,
+                        maxWidth: '120px',
+                        position: 'relative'
+                      }}
+                      title={supplier.name}
+                    >
+                      {supplier.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="btn-group mb-2 flex-wrap" role="group">
+                  <button
+                    className={`btn btn-sm ${filter === 'all' ? 'btn-success' : 'btn-outline-success'}`}
+                    onClick={() => setFilter('all')}
+                  >
+                    Tutte
+                  </button>
+                  {categories.map(category => (
+                    <button
+                      key={category._id}
+                      className={`btn btn-sm ${filter === category._id ? 'btn-success' : 'btn-outline-success'} text-truncate`}
+                      onClick={() => setFilter(category._id)}
+                      style={{ 
+                        maxWidth: '120px',
+                        position: 'relative'
+                      }}
+                      title={category.name}
+                    >
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          
-          <div className="order-content">
-            {/* Left Column - Items */}
-            <div className="items-section">
-              <div className="filter-bar">
-                {/* Filter Controls */}
-                <div className="mb-4">
-                  <div className="d-flex align-items-center mb-2">
-                    <button 
-                      className={`btn ${filterType === 'supplier' ? 'btn-primary' : 'btn-outline-primary'} me-2`}
-                      onClick={() => handleFilterTypeChange('supplier')}
-                    >
-                      Filtra per Fornitore
-                    </button>
-                    <button 
-                      className={`btn ${filterType === 'category' ? 'btn-primary' : 'btn-outline-primary'} me-2`}
-                      onClick={() => handleFilterTypeChange('category')}
-                    >
-                      Filtra per Categoria
-                    </button>
-                  </div>
-                  
-                  {filterType === 'supplier' ? (
-                    <div className="btn-group mb-3" role="group">
-                      <button
-                        className={`btn ${filter === 'all' ? 'btn-success' : 'btn-outline-success'}`}
-                        onClick={() => setFilter('all')}
-                      >
-                        Tutti
-                      </button>
-                      {suppliers.map(supplier => (
-                        <button
-                          key={supplier._id}
-                          className={`btn ${filter === supplier._id ? 'btn-success' : 'btn-outline-success'}`}
-                          onClick={() => setFilter(supplier._id)}
-                          style={{ 
-                            borderLeft: `5px solid ${getSupplierColor(supplier._id)}`,
-                            borderTopLeftRadius: 0,
-                            borderBottomLeftRadius: 0
-                          }}
-                        >
-                          {supplier.name}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="btn-group mb-3" role="group">
-                      <button
-                        className={`btn ${filter === 'all' ? 'btn-success' : 'btn-outline-success'}`}
-                        onClick={() => setFilter('all')}
-                      >
-                        Tutte
-                      </button>
-                      {categories.map(category => (
-                        <button
-                          key={category._id}
-                          className={`btn ${filter === category._id ? 'btn-success' : 'btn-outline-success'}`}
-                          onClick={() => setFilter(category._id)}
-                        >
-                          {category.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="search-container mt-3">
-                  <div className="input-group">
-                    <span className="input-group-text"><i className="bi bi-search"></i></span>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Cerca articoli..."
-                      value={searchTerm}
-                      onChange={handleSearchChange}
-                    />
-                    {searchTerm && (
-                      <button 
-                        className="btn btn-outline-secondary" 
-                        type="button"
-                        onClick={() => setSearchTerm('')}
-                      >
-                        <i className="bi bi-x"></i>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="filter-summary mt-2 mb-3">
-                <small className="text-muted">
-                  {searchTerm ? 
-                    `${getFilteredItems().length} risultati trovati per "${searchTerm}"` : 
-                    `${getFilteredItems().length} articoli totali`
-                  }
-                  {filter !== 'all' && ` (Filtrati per ${filterType === 'supplier' ? 'fornitore: ' + suppliers.find(s => s._id === filter)?.name : 'categoria: ' + categories.find(c => c._id === filter)?.name})`}
-                </small>
-              </div>
-              
-              <div className="items-grid">
-                {getFilteredItems().length > 0 ? (
-                  getFilteredItems().map(item => (
-                    <div 
-                      key={item._id} 
-                      className={`item-card ${selectedItems[item._id] ? 'selected' : ''}`}
-                      onClick={() => handleItemSelect(item._id)}
-                    >
-                      <div className="item-card-header">
-                        <h5 className="item-name">{item.name}</h5>
-                        <small className="item-unit">{item.unit}</small>
-                      </div>
-                      
-                      <div className="item-card-body">
-                        {item.description && <p className="item-description">{item.description}</p>}
-                      </div>
-                      
-                      <div className="item-card-footer">
-                        <span 
-                          className="supplier-tag"
-                          style={{ backgroundColor: getSupplierColor(item.supplierId?._id) }}
-                        >
-                          {item.supplierId?.name || 'Fornitore sconosciuto'}
-                        </span>
-                        
-                        {item.categoryId && (
-                          <span className="category-tag">
-                            {item.categoryId.name}
-                          </span>
-                        )}
-                        
-                        {selectedItems[item._id] && (
-                          <div className="item-quantity-badge">
-                            {selectedItems[item._id].quantity}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="no-items-found">
-                    <p className="text-center text-muted my-4">
-                      <i className="bi bi-search me-2"></i>
-                      {searchTerm ? 
-                        `Nessun articolo trovato per "${searchTerm}"` : 
-                        "Nessun articolo disponibile"
-                      }
-                    </p>
-                  </div>
+            
+            <div className="search-container mt-1">
+              <div className="input-group input-group-sm">
+                <span className="input-group-text"><i className="bi bi-search"></i></span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Cerca articoli..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                />
+                {searchTerm && (
+                  <button 
+                    className="btn btn-outline-secondary" 
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                  >
+                    <i className="bi bi-x"></i>
+                  </button>
                 )}
               </div>
             </div>
-            
-            {/* Right Column - Selected Items */}
-            <div className="selected-section">
-              {Object.keys(selectedItems).length > 0 ? (
-                <div className="selected-items-container">
-                  <div className="selected-items-header">
-                    <h4>Articoli Selezionati</h4>
+          </div>
+          
+          <div className="filter-summary mt-1 mb-2">
+            <small className="text-muted">
+              {searchTerm ? 
+                `${getFilteredItems().length} risultati trovati per "${searchTerm}"` : 
+                `${getFilteredItems().length} articoli totali`
+              }
+              {filter !== 'all' && ` (Filtrati per ${filterType === 'supplier' ? 'fornitore: ' + suppliers.find(s => s._id === filter)?.name : 'categoria: ' + categories.find(c => c._id === filter)?.name})`}
+            </small>
+          </div>
+          
+          <div className="items-grid">
+            {getFilteredItems().length > 0 ? (
+              getFilteredItems().map(item => (
+                <div 
+                  key={item._id} 
+                  className={`item-card ${selectedItems[item._id] ? 'selected' : ''}`}
+                  onClick={() => handleItemSelect(item._id)}
+                  style={{ backgroundColor: getCategoryColor(item.categoryId?._id) }}
+                >
+                  <div className="item-card-header">
+                    <h5 className="item-name">{item.name}</h5>
+                    <small className="item-unit">{item.unit}</small>
                   </div>
-                  <div className="selected-items-list">
-                    {Object.keys(selectedItems).map(itemId => {
-                      const item = items.find(i => i._id === itemId);
-                      return (
-                        <div key={itemId} className="selected-item-row">
+                  
+                  {selectedItems[item._id] && (
+                    <div className="item-quantity-badge">
+                      {selectedItems[item._id].quantity}
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="no-items-found">
+                <p className="text-center text-muted my-3">
+                  <i className="bi bi-search me-2"></i>
+                  {searchTerm ? 
+                    `Nessun articolo trovato per "${searchTerm}"` : 
+                    "Nessun articolo disponibile"
+                  }
+                </p>
+              </div>
+            )}
+          </div>
+          
+          {/* Resize Handle - moved inside items-section */}
+          <div 
+            className={`resize-handle ${isDragging ? 'dragging' : ''}`} 
+            onMouseDown={handleMouseDown}
+          />
+        </div>
+        
+        {/* Right Column - Selected Items */}
+        <div className="selected-section" ref={rightPanelRef}>
+          {Object.keys(selectedItems).length > 0 ? (
+            <div className="selected-items-container">
+              <div className="selected-items-header">
+                <h4>Articoli Selezionati</h4>
+              </div>
+              <div className="selected-items-list">
+                {Object.entries(itemsBySupplier).map(([supplierId, supplierData]) => {
+                  const supplierItems = supplierData.items.filter(item => 
+                    selectedItems[item._id]
+                  );
+                  
+                  if (supplierItems.length === 0) return null;
+                  
+                  return (
+                    <div key={supplierId} className="supplier-group mb-3">
+                      <h5 
+                        className="supplier-name mb-1" 
+                        style={{
+                          backgroundColor: getSupplierColor(supplierId),
+                          padding: '6px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontSize: '0.95rem',
+                          flexWrap: 'wrap',
+                          gap: '5px'
+                        }}
+                        onClick={() => toggleSupplierNote(supplierId)}
+                      >
+                        <span style={{ flex: '1', minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {supplierData.supplier.name}
+                        </span>
+                        <small style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                          {expandedSuppliers.has(supplierId) ? 'Nascondi nota' : 'Aggiungi nota'}
+                        </small>
+                      </h5>
+                      {supplierItems.map(item => (
+                        <div key={item._id} className="selected-item-row">
                           <div className="item-info">
-                            <span className="item-name">{item?.name}</span>
-                            <span className="supplier-name">({item?.supplierId?.name})</span>
+                            <span className="item-name" title={item.name}>{item.name}</span>
                           </div>
                           <div className="quantity-controls">
                             <button 
                               className="btn btn-sm btn-outline-secondary" 
-                              onClick={() => handleDecreaseQuantity(itemId)}
+                              onClick={() => handleDecreaseQuantity(item._id)}
                             >
                               -
                             </button>
-                            <span className="quantity">{selectedItems[itemId].quantity}</span>
+                            <span className="quantity">{selectedItems[item._id].quantity}</span>
                             <button 
                               className="btn btn-sm btn-outline-secondary" 
-                              onClick={() => handleIncreaseQuantity(itemId)}
+                              onClick={() => handleIncreaseQuantity(item._id)}
                             >
                               +
                             </button>
                             <button 
-                              className="btn btn-sm btn-danger ms-2" 
-                              onClick={() => handleRemoveItem(itemId)}
+                              className="btn btn-sm btn-danger" 
+                              onClick={() => handleRemoveItem(item._id)}
                             >
                               <i className="bi bi-trash"></i>
                             </button>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                  
-                  <div className="order-button-container">
-                    <button 
-                      className="btn btn-success btn-lg w-100" 
-                      onClick={handleSubmit}
-                    >
-                      Invia Ordine
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center text-muted h-100 d-flex align-items-center justify-content-center">
-                  <div>
-                    <i className="bi bi-cart3 fs-1"></i>
-                    <p className="mt-3">Seleziona degli articoli dalla lista</p>
-                  </div>
-                </div>
-              )}
+                      ))}
+                      {expandedSuppliers.has(supplierId) && (
+                        <div className="supplier-note mt-2">
+                          <label className="form-label fw-bold">Note per il fornitore:</label>
+                          <textarea
+                            className="form-control"
+                            placeholder="Note per il fornitore (opzionale)"
+                            value={supplierNotes[supplierId] || ''}
+                            onChange={(e) => handleNoteChange(supplierId, e.target.value)}
+                            rows="2"
+                            style={{
+                              border: supplierNotes[supplierId] ? "2px solid green" : "1px solid #ced4da"
+                            }}
+                          />
+                          {supplierNotes[supplierId] && (
+                            <div className="text-success mt-1">
+                              <small>✓ Nota impostata: {supplierNotes[supplierId].length} caratteri</small>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="text-center text-muted h-100 d-flex align-items-center justify-content-center">
+              <div>
+                <i className="bi bi-cart3 fs-1"></i>
+                <p className="mt-2">Seleziona degli articoli dalla lista</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+      
+      {/* Order button container - moved outside of the right column to ensure it's fixed to the viewport */}
+      {Object.keys(selectedItems).length > 0 && (
+        <div className="order-button-container" ref={orderButtonContainerRef}>
+          <button 
+            className="btn btn-success order-button" 
+            onClick={handleSubmit}
+          >
+            Invia Ordine
+          </button>
+        </div>
+      )}
     </div>
   );
 }

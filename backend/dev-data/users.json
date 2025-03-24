@@ -1,0 +1,46 @@
+[
+  {
+    "_id": "67cdf4a225a87a257b3aeff2",
+    "email": "admin@example.com",
+    "password": "$2b$10$PuM2jtRGHonl2bG8BlBD4e/3LcOkNv8Yzge1mNVsDWkp6fIZjqDVi",
+    "name": "Admin",
+    "role": "admin",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "active": true,
+    "createdAt": "2025-03-09T20:05:54.372Z",
+    "__v": 0
+  },
+  {
+    "_id": "67cdf4a225a87a257b3aeff5",
+    "email": "kitchen@example.com",
+    "password": "$2b$10$ZJODl4E0J3UcDKW.t1p2Eu/kZOSRfkNTiVjrzrleDp0fXM87/GboO",
+    "name": "Cucina",
+    "role": "kitchen",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "active": true,
+    "createdAt": "2025-03-09T20:05:54.447Z",
+    "__v": 0
+  },
+  {
+    "_id": "67ce051bad63bd47d0465241",
+    "email": "superadmin@example.com",
+    "password": "$2b$10$yKXI.j1.kJBuzfJEKGti3O.Zp6/X4b69B8Su1LZbLjoBI43fxsUhq",
+    "name": "Super Admin",
+    "role": "superadmin",
+    "restaurantId": "67ce051bad63bd47d046523f",
+    "active": true,
+    "createdAt": "2025-03-09T21:16:11.945Z",
+    "__v": 0
+  },
+  {
+    "_id": "67cef317c9e83cded6201b84",
+    "email": "12345@prova.it",
+    "password": "$2b$10$ppvmbXMAMHOmDGglOUefku1c/wdypdyQzPZZJH/bSAMgB3rzLb8OC",
+    "name": "adminmino",
+    "role": "admin",
+    "restaurantId": "67ce07bd1996044853c514cf",
+    "active": true,
+    "createdAt": "2025-03-10T14:11:35.722Z",
+    "__v": 0
+  }
+]

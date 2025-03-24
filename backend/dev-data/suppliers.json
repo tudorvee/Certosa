@@ -1,0 +1,44 @@
+[
+  {
+    "_id": "67ce172523864fb5c7f72f1f",
+    "name": "vlad",
+    "email": "vlad16518@gmail.com",
+    "phone": "adsf",
+    "address": "asdf",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "__v": 0
+  },
+  {
+    "_id": "67ce194723864fb5c7f72f76",
+    "name": "Andrea Latte",
+    "email": "tudorbizofficial@gmail.com",
+    "phone": "sadf",
+    "address": "asdf",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "__v": 0
+  },
+  {
+    "_id": "67d0269935fdc8732b1da2a6",
+    "name": "Vlad Dolci",
+    "email": "vlad16518@gmail.com",
+    "phone": "3737493682",
+    "restaurantId": "67ce07bd1996044853c514cf",
+    "__v": 0
+  },
+  {
+    "_id": "67d0683c35fdc8732b1da621",
+    "name": "Tudor",
+    "email": "tudorbizofficial@gmail.com",
+    "phone": "",
+    "restaurantId": "67ce07bd1996044853c514cf",
+    "__v": 0
+  },
+  {
+    "_id": "67d1add6551c15248c4c5795",
+    "name": "Nuovo Articolo",
+    "email": "nuovo@prova.it",
+    "phone": "",
+    "restaurantId": "67cdf4a225a87a257b3aefee",
+    "__v": 0
+  }
+]
