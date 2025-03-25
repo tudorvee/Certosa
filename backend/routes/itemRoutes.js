@@ -376,4 +376,71 @@ router.put('/:id/restore', isAdmin, async (req, res) => {
   }
 });
 
+// Bulk create items (only admin can do this)
+router.post('/bulk', isAdmin, async (req, res) => {
+  try {
+    if (!req.restaurantId) {
+      return res.status(400).json({ message: 'Restaurant ID is required' });
+    }
+
+    if (!req.body.items || !Array.isArray(req.body.items)) {
+      return res.status(400).json({ message: 'Items array is required' });
+    }
+
+    // Validate supplier belongs to this restaurant
+    const Supplier = require('../models/Supplier');
+    const supplierIds = [...new Set(req.body.items.map(item => item.supplierId))];
+    const suppliers = await Supplier.find({
+      _id: { $in: supplierIds },
+      restaurantId: req.restaurantId
+    });
+
+    if (suppliers.length !== supplierIds.length) {
+      return res.status(400).json({
+        message: 'Uno o più fornitori selezionati non appartengono a questo ristorante'
+      });
+    }
+
+    // Validate categories if provided
+    const categoryIds = [...new Set(req.body.items
+      .map(item => item.categoryId)
+      .filter(id => id))];
+    
+    if (categoryIds.length > 0) {
+      const Category = require('../models/Category');
+      const categories = await Category.find({
+        _id: { $in: categoryIds },
+        restaurantId: req.restaurantId
+      });
+
+      if (categories.length !== categoryIds.length) {
+        return res.status(400).json({
+          message: 'Una o più categorie selezionate non appartengono a questo ristorante'
+        });
+      }
+    }
+
+    // Add restaurant ID to each item
+    const itemsWithRestaurant = req.body.items.map(item => ({
+      ...item,
+      restaurantId: req.restaurantId
+    }));
+
+    // Create all items
+    const createdItems = await Item.insertMany(itemsWithRestaurant);
+    
+    // Populate supplier and category data for response
+    const populatedItems = await Item.find({
+      _id: { $in: createdItems.map(item => item._id) }
+    })
+    .populate('supplierId')
+    .populate('categoryId');
+
+    res.status(201).json(populatedItems);
+  } catch (err) {
+    console.error('Error creating bulk items:', err);
+    res.status(400).json({ message: err.message });
+  }
+});
+
 module.exports = router; 
