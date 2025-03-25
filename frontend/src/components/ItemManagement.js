@@ -12,7 +12,8 @@ function ItemManagement() {
     description: '', 
     unit: '', 
     supplierId: '',
-    categoryId: ''
+    categoryId: '',
+    activeDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
   });
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -38,12 +39,24 @@ function ItemManagement() {
   const [bulkUnit, setBulkUnit] = useState('');
   const [bulkSupplierId, setBulkSupplierId] = useState('');
   const [bulkCategoryId, setBulkCategoryId] = useState('');
+  const [bulkActiveDays, setBulkActiveDays] = useState(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
   const [showInactiveItems, setShowInactiveItems] = useState(false);
   const [inactiveItems, setInactiveItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Add state for active tab
   const [activeTab, setActiveTab] = useState('list');
+  
+  // Add days of week array
+  const daysOfWeek = [
+    { id: 'monday', label: 'Lunedì' },
+    { id: 'tuesday', label: 'Martedì' },
+    { id: 'wednesday', label: 'Mercoledì' },
+    { id: 'thursday', label: 'Giovedì' },
+    { id: 'friday', label: 'Venerdì' },
+    { id: 'saturday', label: 'Sabato' },
+    { id: 'sunday', label: 'Domenica' }
+  ];
   
   useEffect(() => {
     fetchData();
@@ -118,7 +131,8 @@ function ItemManagement() {
         description: '', 
         unit: '', 
         supplierId: '',
-        categoryId: ''
+        categoryId: '',
+        activeDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
       });
       
       // Refresh data
@@ -138,12 +152,11 @@ function ItemManagement() {
       description: item.description || '',
       unit: item.unit,
       supplierId: item.supplierId._id,
-      categoryId: item.categoryId?._id || ''
+      categoryId: item.categoryId?._id || '',
+      activeDays: item.activeDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
     });
     setEditMode(true);
     setEditingItemId(item._id);
-    
-    // Switch to add/edit tab
     setActiveTab('add');
   };
   
@@ -153,7 +166,8 @@ function ItemManagement() {
       description: '', 
       unit: '', 
       supplierId: '',
-      categoryId: ''
+      categoryId: '',
+      activeDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
     });
     setEditMode(false);
     setEditingItemId(null);
@@ -351,11 +365,17 @@ function ItemManagement() {
       try {
         console.log(`Attempting to bulk edit ${selectedIds.length} items`);
         
+        // Prepare the update data
+        const updateData = {};
+        if (bulkEditField === 'activeDays') {
+          updateData.activeDays = JSON.parse(bulkEditValue);
+        } else {
+          updateData[bulkEditField] = bulkEditValue;
+        }
+        
         // Update all selected items
         await Promise.all(
-          selectedIds.map(id => apiCall(`/api/items/${id}`, 'put', {
-            [bulkEditField]: bulkEditValue
-          }))
+          selectedIds.map(id => apiCall(`/api/items/${id}`, 'put', updateData))
         );
         
         setMessage(`${selectedIds.length} articoli aggiornati con successo`);
@@ -483,54 +503,52 @@ function ItemManagement() {
   };
   
   const handleBulkAddWithForm = async () => {
-    const itemNames = bulkItemText
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line);
-    
-    if (itemNames.length === 0) {
-      setMessage('Inserisci almeno un nome articolo');
+    if (!bulkItemText || !bulkUnit || !bulkSupplierId) {
+      setMessage('Compila tutti i campi obbligatori');
       return;
     }
-    
+
     try {
       setProcessingImport(true);
       setMessage('');
-      
-      // Prepare the common data for all items
-      const commonData = {
-        unit: bulkUnit,
-        supplierId: bulkSupplierId || '',
-        categoryId: bulkCategoryId || ''
-      };
-      
-      // Create items one by one
-      let successCount = 0;
-      
-      for (const name of itemNames) {
-        try {
-          const itemData = {
-            name: name,
-            ...commonData
-          };
-          
-          await apiCall('/api/items', 'post', itemData);
-          successCount++;
-        } catch (err) {
-          console.error('Error adding item:', name, err);
-        }
+
+      // Split items by newline and filter out empty lines
+      const itemNames = bulkItemText
+        .split('\n')
+        .map(name => name.trim())
+        .filter(name => name);
+
+      if (itemNames.length === 0) {
+        setMessage('Inserisci almeno un articolo');
+        return;
       }
+
+      // Create items array
+      const items = itemNames.map(name => ({
+        name,
+        unit: bulkUnit,
+        supplierId: bulkSupplierId,
+        categoryId: bulkCategoryId || undefined,
+        activeDays: bulkActiveDays
+      }));
+
+      // Send request to create items
+      const response = await apiCall('/api/items/bulk', 'post', { items });
       
-      // Show results and reset
-      setMessage(`Importazione completata: ${successCount} articoli aggiunti su ${itemNames.length}`);
-      fetchData();
-      
-      // Reset the form
+      // Reset form
       setBulkItemText('');
+      setBulkUnit('');
+      setBulkSupplierId('');
+      setBulkCategoryId('');
+      setBulkActiveDays(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
       
-    } catch (err) {
-      console.error('Error during import:', err);
-      setMessage('Errore durante l\'importazione');
+      // Refresh data and show success message
+      await fetchData();
+      setMessage(`${response.data.length} articoli aggiunti con successo!`);
+      
+    } catch (error) {
+      console.error('Error adding bulk items:', error);
+      setMessage('Errore durante l\'aggiunta degli articoli. Riprova.');
     } finally {
       setProcessingImport(false);
     }
@@ -594,6 +612,15 @@ function ItemManagement() {
     (item.supplierId?.name && item.supplierId.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (item.categoryId?.name && item.categoryId.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+  
+  const handleDayToggle = (day) => {
+    setItemForm(prev => ({
+      ...prev,
+      activeDays: prev.activeDays.includes(day) 
+        ? prev.activeDays.filter(d => d !== day)
+        : [...prev.activeDays, day]
+    }));
+  };
   
   if (loading) {
     return <div className="text-center my-5"><div className="spinner-border" role="status"></div></div>;
@@ -794,12 +821,21 @@ function ItemManagement() {
                           className="form-select form-select-sm"
                           style={{ width: 'auto' }}
                           value={bulkEditField}
-                          onChange={(e) => setBulkEditField(e.target.value)}
+                          onChange={(e) => {
+                            setBulkEditField(e.target.value);
+                            // Initialize bulkEditValue for activeDays
+                            if (e.target.value === 'activeDays') {
+                              setBulkEditValue(JSON.stringify([]));
+                            } else {
+                              setBulkEditValue('');
+                            }
+                          }}
                         >
                           <option value="">Campo...</option>
                           <option value="categoryId">Categoria</option>
                           <option value="supplierId">Fornitore</option>
                           <option value="unit">Unità</option>
+                          <option value="activeDays">Giorni di disponibilità</option>
                         </select>
                         
                         {bulkEditField === 'categoryId' && (
@@ -816,6 +852,31 @@ function ItemManagement() {
                               </option>
                             ))}
                           </select>
+                        )}
+                        
+                        {bulkEditField === 'activeDays' && (
+                          <div className="d-flex flex-wrap gap-2">
+                            {daysOfWeek.map(day => (
+                              <div key={day.id} className="form-check">
+                                <input
+                                  type="checkbox"
+                                  className="form-check-input"
+                                  id={`bulk-edit-day-${day.id}`}
+                                  checked={bulkEditValue ? JSON.parse(bulkEditValue).includes(day.id) : false}
+                                  onChange={() => {
+                                    const currentDays = bulkEditValue ? JSON.parse(bulkEditValue) : [];
+                                    const newDays = currentDays.includes(day.id)
+                                      ? currentDays.filter(d => d !== day.id)
+                                      : [...currentDays, day.id];
+                                    setBulkEditValue(JSON.stringify(newDays));
+                                  }}
+                                />
+                                <label className="form-check-label" htmlFor={`bulk-edit-day-${day.id}`}>
+                                  {day.label}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
                         )}
                         
                         {bulkEditField === 'supplierId' && (
@@ -1056,6 +1117,26 @@ function ItemManagement() {
                 ></textarea>
               </div>
               
+              <div className="mb-3">
+                <label className="form-label">Giorni di disponibilità</label>
+                <div className="d-flex flex-wrap gap-2">
+                  {daysOfWeek.map(day => (
+                    <div key={day.id} className="form-check">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id={`day-${day.id}`}
+                        checked={itemForm.activeDays.includes(day.id)}
+                        onChange={() => handleDayToggle(day.id)}
+                      />
+                      <label className="form-check-label" htmlFor={`day-${day.id}`}>
+                        {day.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
               <div className="d-flex gap-2">
                 <button type="submit" className={`btn ${editMode ? 'btn-warning' : 'btn-success'}`}>
                   {editMode ? 'Aggiorna Articolo' : 'Aggiungi Articolo'}
@@ -1078,86 +1159,112 @@ function ItemManagement() {
             <h4 className="mb-0">Aggiungi Articoli in Blocco</h4>
           </div>
           <div className="card-body">
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              handleBulkAddWithForm();
-            }}>
-              <div className="row mb-3">
-                <div className="col-md-6">
-                  <label className="form-label">Nomi Articoli (uno per riga)</label>
-                  <textarea 
-                    className="form-control" 
-                    rows="10" 
-                    value={bulkItemText}
-                    onChange={(e) => setBulkItemText(e.target.value)}
-                    placeholder="CONIGLIO INTERO&#10;STRACCIATELLA PROD. FAIC VS&#10;CROCHETTE PATATE MIGNON&#10;..."
+            <div className="bulk-add-form">
+              <h4>Aggiungi Articoli in Blocco</h4>
+              <p className="text-muted">
+                Inserisci un articolo per riga. Tutti gli articoli avranno le stesse proprietà selezionate sotto.
+              </p>
+              
+              <div className="mb-3">
+                <label className="form-label">Articoli (uno per riga)</label>
+                <textarea
+                  className="form-control"
+                  value={bulkItemText}
+                  onChange={(e) => setBulkItemText(e.target.value)}
+                  rows="5"
+                  placeholder="Esempio:&#10;Pomodori&#10;Carote&#10;Patate"
+                  required
+                />
+              </div>
+
+              <div className="row">
+                <div className="col-md-6 mb-3">
+                  <label className="form-label">Unità</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={bulkUnit}
+                    onChange={(e) => setBulkUnit(e.target.value)}
+                    placeholder="es. kg, pezzi, scatole"
                     required
-                  ></textarea>
+                  />
                 </div>
-                <div className="col-md-6">
-                  <div className="mb-3">
-                    <label className="form-label">Unità (es. kg, pezzi, scatole)</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      name="bulkUnit" 
-                      value={bulkUnit} 
-                      onChange={(e) => setBulkUnit(e.target.value)}
-                    />
-                    <div className="form-text">Opzionale - sarà applicata a tutti gli articoli</div>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <label className="form-label">Fornitore</label>
-                    <select 
-                      className="form-select" 
-                      value={bulkSupplierId}
-                      onChange={(e) => setBulkSupplierId(e.target.value)}
-                    >
-                      <option value="">Nessun fornitore</option>
-                      {suppliers.map(supplier => (
-                        <option key={supplier._id} value={supplier._id}>
-                          {supplier.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="form-text">Opzionale - sarà applicato a tutti gli articoli</div>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <label className="form-label">Categoria</label>
-                    <select 
-                      className="form-select"
-                      value={bulkCategoryId}
-                      onChange={(e) => setBulkCategoryId(e.target.value)}
-                    >
-                      <option value="">Nessuna categoria</option>
-                      {categories.map(category => (
-                        <option key={category._id} value={category._id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="form-text">Opzionale - sarà applicata a tutti gli articoli</div>
-                  </div>
+                <div className="col-md-6 mb-3">
+                  <label className="form-label">Fornitore</label>
+                  <select
+                    className="form-select"
+                    value={bulkSupplierId}
+                    onChange={(e) => setBulkSupplierId(e.target.value)}
+                    required
+                  >
+                    <option value="">Seleziona fornitore...</option>
+                    {suppliers.map(supplier => (
+                      <option key={supplier._id} value={supplier._id}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              
-              <button 
-                type="submit"
+
+              <div className="mb-3">
+                <label className="form-label">Categoria (opzionale)</label>
+                <select
+                  className="form-select"
+                  value={bulkCategoryId}
+                  onChange={(e) => setBulkCategoryId(e.target.value)}
+                >
+                  <option value="">Seleziona categoria...</option>
+                  {categories.map(category => (
+                    <option key={category._id} value={category._id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label">Giorni di disponibilità</label>
+                <div className="d-flex flex-wrap gap-2">
+                  {daysOfWeek.map(day => (
+                    <div key={day.id} className="form-check">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id={`bulk-day-${day.id}`}
+                        checked={bulkActiveDays.includes(day.id)}
+                        onChange={() => {
+                          setBulkActiveDays(prev => 
+                            prev.includes(day.id)
+                              ? prev.filter(d => d !== day.id)
+                              : [...prev, day.id]
+                          );
+                        }}
+                      />
+                      <label className="form-check-label" htmlFor={`bulk-day-${day.id}`}>
+                        {day.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
                 className="btn btn-primary"
-                disabled={!bulkItemText.trim() || processingImport}
+                onClick={handleBulkAddWithForm}
+                disabled={processingImport}
               >
                 {processingImport ? (
                   <>
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Importazione...
+                    Aggiunta in corso...
                   </>
                 ) : (
                   'Aggiungi Articoli'
                 )}
               </button>
-            </form>
+            </div>
           </div>
         </div>
       )}

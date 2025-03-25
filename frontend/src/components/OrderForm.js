@@ -19,154 +19,130 @@ function OrderForm() {
   const [isDragging, setIsDragging] = useState(false);
   const leftPanelRef = useRef(null);
   const rightPanelRef = useRef(null);
-  const initialMousePos = useRef(0);
+  const containerRef = useRef(null);
+  const initialX = useRef(0);
   const initialLeftWidth = useRef(0);
-  const orderButtonContainerRef = useRef(null);
+  const [isCartExpanded, setIsCartExpanded] = useState(false);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(60);
+  const [isCartVisible, setIsCartVisible] = useState(false);
+  const [itemsBySupplier, setItemsBySupplier] = useState({});
   
+  // Add clearCart function
+  const clearCart = () => {
+    setSelectedItems({});
+    setSupplierNotes({});
+    localStorage.removeItem('cartState');
+  };
+
+  // Load saved cart state on component mount
+  useEffect(() => {
+    const savedCart = localStorage.getItem('cartState');
+    if (savedCart) {
+      const { selectedItems: savedItems, supplierNotes: savedNotes } = JSON.parse(savedCart);
+      setSelectedItems(savedItems);
+      setSupplierNotes(savedNotes);
+    }
+  }, []);
+
+  // Save cart state whenever it changes
+  useEffect(() => {
+    if (Object.keys(selectedItems).length > 0 || Object.keys(supplierNotes).length > 0) {
+      localStorage.setItem('cartState', JSON.stringify({
+        selectedItems,
+        supplierNotes
+      }));
+    }
+  }, [selectedItems, supplierNotes]);
+
   useEffect(() => {
     fetchData();
   }, []);
   
-  // Add a function to update button width
-  const updateButtonPosition = useCallback(() => {
-    if (rightPanelRef.current && orderButtonContainerRef.current) {
-      const rightPanelRect = rightPanelRef.current.getBoundingClientRect();
-      
-      // Get the width - ensure minimum of 250px
-      const buttonWidth = Math.max(250, rightPanelRect.width);
-      
-      // Set width and position without any delay
-      orderButtonContainerRef.current.style.width = `${buttonWidth}px`;
-      
-      // Position from the right edge of the screen
-      const rightOffset = window.innerWidth - (rightPanelRect.left + rightPanelRect.width);
-      orderButtonContainerRef.current.style.right = `${rightOffset}px`;
-    }
-  }, []);
-  
-  // Update button position when resizing
-  useEffect(() => {
-    // Initial positioning
-    updateButtonPosition();
-    
-    // Set up resize observer to update button position when cart size changes
-    const resizeObserver = new ResizeObserver(() => {
-      updateButtonPosition();
-    });
-    
-    if (rightPanelRef.current) {
-      resizeObserver.observe(rightPanelRef.current);
-    }
-    
-    // Also listen to window resize events
-    window.addEventListener('resize', updateButtonPosition);
-    
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', updateButtonPosition);
-    };
-  }, [updateButtonPosition]);
+  const handleMouseDown = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+    initialX.current = e.clientX;
+    initialLeftWidth.current = leftPanelRef.current.getBoundingClientRect().width;
+    document.body.classList.add('resizing');
+  };
 
-  // Create updateRightPanel function to avoid circular dependency
-  const updateRightPanel = useCallback((newLeftWidth) => {
-    if (rightPanelRef.current) {
-      rightPanelRef.current.style.width = `calc(100% - ${newLeftWidth}px)`;
-      rightPanelRef.current.style.flex = 'none';
-      
-      // Update the button position directly here for immediate response
-      if (orderButtonContainerRef.current) {
-        // Get updated right panel position after width change
-        const rightPanelRect = rightPanelRef.current.getBoundingClientRect();
-        
-        // Get the width - ensure minimum of 250px
-        const buttonWidth = Math.max(250, rightPanelRect.width);
-        
-        // Set width and position without any delay
-        orderButtonContainerRef.current.style.width = `${buttonWidth}px`;
-        
-        // Position from the right edge of the screen
-        const rightOffset = window.innerWidth - (rightPanelRect.left + rightPanelRect.width);
-        orderButtonContainerRef.current.style.right = `${rightOffset}px`;
-      }
-    }
-  }, []);
-  
-  // Update panel movement without circular dependency
   const handleMouseMove = useCallback((e) => {
     if (!isDragging) return;
+
+    const delta = e.clientX - initialX.current;
+    const containerWidth = containerRef.current.getBoundingClientRect().width;
+    const newWidth = initialLeftWidth.current + delta;
+    const newPercentage = (newWidth / containerWidth) * 100;
+
+    // Constrain between 30% and 70%
+    const constrainedPercentage = Math.min(Math.max(newPercentage, 30), 70);
     
-    const deltaX = e.clientX - initialMousePos.current;
-    const newLeftWidth = initialLeftWidth.current + deltaX;
-    
-    // Set minimum and maximum widths
-    const minLeftWidth = 200; // Minimum width for left panel (in pixels)
-    const maxLeftWidth = window.innerWidth - 220; // Maximum width, leaving 220px for right panel
-    
-    if (newLeftWidth >= minLeftWidth && newLeftWidth <= maxLeftWidth && leftPanelRef.current) {
-      leftPanelRef.current.style.width = `${newLeftWidth}px`;
-      leftPanelRef.current.style.flex = 'none';
-      
-      // Adjust the right panel to take remaining space
-      updateRightPanel(newLeftWidth);
-    }
-  }, [isDragging, updateRightPanel]);
+    leftPanelRef.current.style.width = `${constrainedPercentage}%`;
+    rightPanelRef.current.style.width = `${100 - constrainedPercentage}%`;
+    setLeftPanelWidth(constrainedPercentage);
+  }, [isDragging]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-    
-    // Remove resizing class from body
     document.body.classList.remove('resizing');
-    
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-  }, []); // Using empty dependencies to avoid circular dependency
+  }, []);
 
-  // Need to use useEffect to handle the circular dependency
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     }
-    
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const handleMouseDown = useCallback((e) => {
-    e.preventDefault();
-    setIsDragging(true);
-    initialMousePos.current = e.clientX;
-    
-    if (leftPanelRef.current) {
-      initialLeftWidth.current = leftPanelRef.current.getBoundingClientRect().width;
-    }
-    
-    // Add resizing class to body
-    document.body.classList.add('resizing');
-    
-    // Event listeners are now added in the useEffect
-  }, []);
-  
-  // The cleanup useEffect is now combined with the one above
-  
+  const getCurrentDayOfWeek = () => {
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const today = new Date().getDay(); // 0 is Sunday, 1 is Monday, etc.
+    return days[today];
+  };
+
   const fetchData = async () => {
     try {
-      console.log('Fetching order form data...');
+      setLoading(true);
       const [itemsRes, suppliersRes, categoriesRes] = await Promise.all([
         apiCall('/api/items'),
         apiCall('/api/suppliers'),
         apiCall('/api/categories')
       ]);
+
+      const currentDay = getCurrentDayOfWeek();
       
-      setItems(itemsRes.data);
+      // Filter items that are active on the current day
+      const availableItems = itemsRes.data.filter(item => 
+        item.activeDays?.includes(currentDay)
+      );
+
+      setItems(availableItems);
       setSuppliers(suppliersRes.data);
       setCategories(categoriesRes.data);
-      setLoading(false);
+
+      // Group items by supplier
+      const groupedItems = {};
+      availableItems.forEach(item => {
+        if (item.supplierId && item.supplierId._id) {
+          if (!groupedItems[item.supplierId._id]) {
+            groupedItems[item.supplierId._id] = {
+              supplier: item.supplierId,
+              items: []
+            };
+          }
+          groupedItems[item.supplierId._id].items.push(item);
+        }
+      });
+      setItemsBySupplier(groupedItems);
+
     } catch (err) {
-      console.error('Error fetching order form data:', err);
+      console.error('Error fetching data:', err);
       setMessage('Errore nel caricamento dei dati');
+    } finally {
       setLoading(false);
     }
   };
@@ -228,23 +204,6 @@ function OrderForm() {
     });
   };
   
-  // Group items by supplier
-  const itemsBySupplier = useMemo(() => {
-    return items.reduce((acc, item) => {
-      if (item.supplierId) {
-        const supplierId = item.supplierId._id;
-        if (!acc[supplierId]) {
-          acc[supplierId] = {
-            supplier: item.supplierId,
-            items: []
-          };
-        }
-        acc[supplierId].items.push(item);
-      }
-      return acc;
-    }, {});
-  }, [items]);
-  
   // Handle note change for a supplier
   const handleNoteChange = (supplierId, note) => {
     console.log('Setting note for supplier:', supplierId, note);
@@ -303,7 +262,9 @@ function OrderForm() {
       console.log('Order submitted successfully:', response.data);
       setMessage('Ordine inviato con successo! Le email sono state inviate ai fornitori.');
       setSelectedItems({});
-      setSupplierNotes({});  // Clear notes after successful submission
+      setSupplierNotes({});
+      // Clear cart from localStorage after successful submission
+      localStorage.removeItem('cartState');
     } catch (err) {
       console.error('Error creating order:', err);
       
@@ -353,26 +314,58 @@ function OrderForm() {
   
   // Get filtered items based on current filter settings
   const getFilteredItems = () => {
-    let filteredItems = [...items];
+    if (!Array.isArray(items) || items.length === 0) {
+      return [];
+    }
+
+    // Get current day of the week
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDay = days[new Date().getDay()];
+
+    // First filter by active days - safely handle undefined activeDays
+    let filteredItems = items.filter(item => 
+      item && Array.isArray(item.activeDays) && item.activeDays.includes(currentDay)
+    );
     
-    // Apply search term filter
-    if (searchTerm.trim() !== '') {
+    // Then apply search term filter if it exists
+    if (searchTerm?.trim()) {
       filteredItems = filteredItems.filter(item => 
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        item && (
+          (item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()))
+        )
       );
     }
     
-    // Apply supplier/category filter
-    if (filter !== 'all') {
+    // Apply supplier/category filter if one is selected
+    if (filter && filter !== 'all') {
       if (filterType === 'supplier') {
-        filteredItems = filteredItems.filter(item => item.supplierId?._id === filter);
+        filteredItems = filteredItems.filter(item => 
+          item && item.supplierId && item.supplierId._id === filter
+        );
       } else if (filterType === 'category') {
-        filteredItems = filteredItems.filter(item => item.categoryId?._id === filter);
+        filteredItems = filteredItems.filter(item => 
+          item && item.categoryId && item.categoryId._id === filter
+        );
       }
     }
     
     return filteredItems;
+  };
+  
+  // Add a function to get the current day name in Italian
+  const getCurrentDayInItalian = () => {
+    const days = {
+      'sunday': 'Domenica',
+      'monday': 'Lunedì',
+      'tuesday': 'Martedì',
+      'wednesday': 'Mercoledì',
+      'thursday': 'Giovedì',
+      'friday': 'Venerdì',
+      'saturday': 'Sabato'
+    };
+    const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date().getDay()];
+    return days[currentDay];
   };
   
   // Add a new function to test email
@@ -539,6 +532,50 @@ function OrderForm() {
     }
   };
   
+  // Add this function to toggle cart expansion
+  const toggleCart = () => {
+    setIsCartExpanded(!isCartExpanded);
+  };
+
+  // Add this function to get the number of items in cart
+  const getCartItemCount = () => {
+    return Object.keys(selectedItems).length;
+  };
+  
+  // Add function to toggle cart visibility on mobile
+  const toggleMobileCart = () => {
+    setIsCartVisible(!isCartVisible);
+    // Add or remove a class to prevent body scrolling when cart is open
+    if (!isCartVisible) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+  };
+
+  // Clean up body overflow when component unmounts
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  // Get total items count
+  const getTotalItemsCount = () => {
+    return Object.values(selectedItems).reduce((total, item) => total + item.quantity, 0);
+  };
+  
+  // Add Italian day names mapping
+  const dayNamesItalian = {
+    'Sunday': 'Domenica',
+    'Monday': 'Lunedì',
+    'Tuesday': 'Martedì',
+    'Wednesday': 'Mercoledì',
+    'Thursday': 'Giovedì',
+    'Friday': 'Venerdì',
+    'Saturday': 'Sabato'
+  };
+  
   if (loading) {
     return <div className="text-center my-3"><div className="spinner-border" role="status"></div></div>;
   }
@@ -551,9 +588,12 @@ function OrderForm() {
         </div>
       )}
       
-      <div className="order-content">
-        {/* Left Column - Items */}
-        <div className="items-section" ref={leftPanelRef}>
+      <div className="order-content" ref={containerRef}>
+        <div 
+          className="items-section" 
+          ref={leftPanelRef}
+          style={{ width: `${leftPanelWidth}%` }}
+        >
           <div className="filter-bar">
             {/* Filter Controls */}
             <div className="mb-2">
@@ -651,7 +691,7 @@ function OrderForm() {
             <small className="text-muted">
               {searchTerm ? 
                 `${getFilteredItems().length} risultati trovati per "${searchTerm}"` : 
-                `${getFilteredItems().length} articoli totali`
+                `${getFilteredItems().length} articoli disponibili per ${getCurrentDayInItalian()}`
               }
               {filter !== 'all' && ` (Filtrati per ${filterType === 'supplier' ? 'fornitore: ' + suppliers.find(s => s._id === filter)?.name : 'categoria: ' + categories.find(c => c._id === filter)?.name})`}
             </small>
@@ -691,128 +731,150 @@ function OrderForm() {
             )}
           </div>
           
-          {/* Resize Handle - moved inside items-section */}
-          <div 
-            className={`resize-handle ${isDragging ? 'dragging' : ''}`} 
-            onMouseDown={handleMouseDown}
-          />
+          <div className="resize-handle" onMouseDown={handleMouseDown} />
         </div>
         
-        {/* Right Column - Selected Items */}
-        <div className="selected-section" ref={rightPanelRef}>
-          {Object.keys(selectedItems).length > 0 ? (
-            <div className="selected-items-container">
-              <div className="selected-items-header">
-                <h4>Articoli Selezionati</h4>
+        <div 
+          className={`selected-section ${isCartVisible ? 'expanded' : ''}`}
+          ref={rightPanelRef}
+          style={{ width: `${100 - leftPanelWidth}%` }}
+        >
+          <div className="selected-section-header">
+            <div className="d-flex align-items-center">
+              <h3 className="mb-0">
+                <i className="bi bi-cart me-2"></i>
+                Carrello
+              </h3>
+              {getTotalItemsCount() > 0 && (
+                <button 
+                  className="btn btn-sm btn-outline-danger ms-3"
+                  onClick={clearCart}
+                  title="Rimuovi tutti gli articoli dal carrello"
+                >
+                  <i className="bi bi-trash me-1"></i>
+                  Svuota Carrello
+                </button>
+              )}
+            </div>
+            <div className="d-flex align-items-center">
+              <div className="me-3">
+                {getTotalItemsCount()} {getTotalItemsCount() === 1 ? 'articolo' : 'articoli'}
               </div>
-              <div className="selected-items-list">
-                {Object.entries(itemsBySupplier).map(([supplierId, supplierData]) => {
-                  const supplierItems = supplierData.items.filter(item => 
-                    selectedItems[item._id]
-                  );
-                  
-                  if (supplierItems.length === 0) return null;
-                  
-                  return (
-                    <div key={supplierId} className="supplier-group mb-3">
-                      <h5 
-                        className="supplier-name mb-1" 
-                        style={{
-                          backgroundColor: getSupplierColor(supplierId),
-                          padding: '6px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          fontSize: '0.95rem',
-                          flexWrap: 'wrap',
-                          gap: '5px'
-                        }}
-                        onClick={() => toggleSupplierNote(supplierId)}
-                      >
-                        <span style={{ flex: '1', minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {supplierData.supplier.name}
-                        </span>
-                        <small style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                          {expandedSuppliers.has(supplierId) ? 'Nascondi nota' : 'Aggiungi nota'}
-                        </small>
-                      </h5>
-                      {supplierItems.map(item => (
-                        <div key={item._id} className="selected-item-row">
-                          <div className="item-info">
-                            <span className="item-name" title={item.name}>{item.name}</span>
-                          </div>
-                          <div className="quantity-controls">
-                            <button 
-                              className="btn btn-sm btn-outline-secondary" 
-                              onClick={() => handleDecreaseQuantity(item._id)}
-                            >
-                              -
-                            </button>
-                            <span className="quantity">{selectedItems[item._id].quantity}</span>
-                            <button 
-                              className="btn btn-sm btn-outline-secondary" 
-                              onClick={() => handleIncreaseQuantity(item._id)}
-                            >
-                              +
-                            </button>
-                            <button 
-                              className="btn btn-sm btn-danger" 
-                              onClick={() => handleRemoveItem(item._id)}
-                            >
-                              <i className="bi bi-trash"></i>
-                            </button>
-                          </div>
+              <i 
+                className="bi bi-x-lg close-cart" 
+                onClick={toggleMobileCart}
+              ></i>
+            </div>
+          </div>
+
+          <div className="selected-items-list">
+            {Object.entries(itemsBySupplier).map(([supplierId, supplierData]) => {
+              const supplierItems = supplierData.items.filter(item => 
+                selectedItems[item._id]
+              );
+              
+              if (supplierItems.length === 0) return null;
+              
+              return (
+                <div key={supplierId} className="supplier-group mb-3">
+                  <h5 
+                    className="supplier-name mb-1" 
+                    style={{
+                      backgroundColor: getSupplierColor(supplierId),
+                      padding: '6px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '0.95rem',
+                      flexWrap: 'wrap',
+                      gap: '5px'
+                    }}
+                    onClick={() => toggleSupplierNote(supplierId)}
+                  >
+                    <span style={{ flex: '1', minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {supplierData.supplier.name}
+                    </span>
+                    <small style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                      {expandedSuppliers.has(supplierId) ? 'Nascondi nota' : 'Aggiungi nota'}
+                    </small>
+                  </h5>
+                  {supplierItems.map(item => (
+                    <div key={item._id} className="selected-item-row">
+                      <div className="item-info">
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="item-name" title={item.name}>{item.name}</span>
+                          <small className="text-muted">({item.unit})</small>
                         </div>
-                      ))}
-                      {expandedSuppliers.has(supplierId) && (
-                        <div className="supplier-note mt-2">
-                          <label className="form-label fw-bold">Note per il fornitore:</label>
-                          <textarea
-                            className="form-control"
-                            placeholder="Note per il fornitore (opzionale)"
-                            value={supplierNotes[supplierId] || ''}
-                            onChange={(e) => handleNoteChange(supplierId, e.target.value)}
-                            rows="2"
-                            style={{
-                              border: supplierNotes[supplierId] ? "2px solid green" : "1px solid #ced4da"
-                            }}
-                          />
-                          {supplierNotes[supplierId] && (
-                            <div className="text-success mt-1">
-                              <small>✓ Nota impostata: {supplierNotes[supplierId].length} caratteri</small>
-                            </div>
-                          )}
+                      </div>
+                      <div className="quantity-controls">
+                        <button 
+                          className="btn btn-sm btn-outline-secondary" 
+                          onClick={() => handleDecreaseQuantity(item._id)}
+                        >
+                          -
+                        </button>
+                        <span className="quantity">{selectedItems[item._id].quantity}</span>
+                        <button 
+                          className="btn btn-sm btn-outline-secondary" 
+                          onClick={() => handleIncreaseQuantity(item._id)}
+                        >
+                          +
+                        </button>
+                        <button 
+                          className="btn btn-sm btn-danger" 
+                          onClick={() => handleRemoveItem(item._id)}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {expandedSuppliers.has(supplierId) && (
+                    <div className="supplier-note mt-2">
+                      <label className="form-label fw-bold">Note per il fornitore:</label>
+                      <textarea
+                        className="form-control"
+                        placeholder="Note per il fornitore (opzionale)"
+                        value={supplierNotes[supplierId] || ''}
+                        onChange={(e) => handleNoteChange(supplierId, e.target.value)}
+                        rows="2"
+                        style={{
+                          border: supplierNotes[supplierId] ? "2px solid green" : "1px solid #ced4da"
+                        }}
+                      />
+                      {supplierNotes[supplierId] && (
+                        <div className="text-success mt-1">
+                          <small>✓ Nota impostata: {supplierNotes[supplierId].length} caratteri</small>
                         </div>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center text-muted h-100 d-flex align-items-center justify-content-center">
-              <div>
-                <i className="bi bi-cart3 fs-1"></i>
-                <p className="mt-2">Seleziona degli articoli dalla lista</p>
-              </div>
-            </div>
-          )}
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="order-button-container">
+            <button
+              className="btn btn-primary order-button"
+              onClick={handleSubmit}
+            >
+              <i className="bi bi-send" />
+              <span>Invia Ordine</span>
+            </button>
+          </div>
         </div>
       </div>
-      
-      {/* Order button container - moved outside of the right column to ensure it's fixed to the viewport */}
-      {Object.keys(selectedItems).length > 0 && (
-        <div className="order-button-container" ref={orderButtonContainerRef}>
-          <button 
-            className="btn btn-success order-button" 
-            onClick={handleSubmit}
-          >
-            Invia Ordine
-          </button>
-        </div>
-      )}
+
+      {/* Mobile cart button */}
+      <div className="mobile-cart-button" onClick={toggleMobileCart}>
+        <i className="bi bi-cart-fill"></i>
+        {getTotalItemsCount() > 0 && (
+          <div className="cart-count">{getTotalItemsCount()}</div>
+        )}
+      </div>
     </div>
   );
 }

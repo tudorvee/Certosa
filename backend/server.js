@@ -35,7 +35,7 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true }));
 
 // Replace the existing mongoose.connect with this
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/certosaDB';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/kitchen-order-app-dev';
 console.log('Attempting to connect to MongoDB...');
 
 mongoose.connect(MONGODB_URI, {
