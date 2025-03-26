@@ -707,8 +707,7 @@ function OrderForm() {
                   style={{ backgroundColor: getCategoryColor(item.categoryId?._id) }}
                 >
                   <div className="item-card-header">
-                    <h5 className="item-name">{item.name}</h5>
-                    <small className="item-unit">{item.unit}</small>
+                    <h5 className="item-name" title={item.name}>{item.name}</h5>
                   </div>
                   
                   {selectedItems[item._id] && (
@@ -803,9 +802,9 @@ function OrderForm() {
                   {supplierItems.map(item => (
                     <div key={item._id} className="selected-item-row">
                       <div className="item-info">
-                        <div className="d-flex align-items-center gap-2">
+                        <div style={{ display: "flex", alignItems: "flex-start" }}>
                           <span className="item-name" title={item.name}>{item.name}</span>
-                          <small className="text-muted">({item.unit})</small>
+                          <small className="text-muted" style={{ marginLeft: "5px" }}>({item.unit})</small>
                         </div>
                       </div>
                       <div className="quantity-controls">
