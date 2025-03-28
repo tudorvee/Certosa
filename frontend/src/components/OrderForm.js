@@ -23,8 +23,8 @@ function OrderForm() {
   const initialX = useRef(0);
   const initialLeftWidth = useRef(0);
   const [isCartExpanded, setIsCartExpanded] = useState(false);
-  const [leftPanelWidth, setLeftPanelWidth] = useState(60);
-  const [isCartVisible, setIsCartVisible] = useState(false);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(100); // Start with items section at 100%
+  const [isCartVisible, setIsCartVisible] = useState(false); // Cart starts hidden
   const [itemsBySupplier, setItemsBySupplier] = useState({});
   
   // Add clearCart function
@@ -148,6 +148,8 @@ function OrderForm() {
   };
   
   const handleItemSelect = (itemId) => {
+    const wasEmpty = Object.keys(selectedItems).length === 0;
+    
     setSelectedItems(prev => {
       const updatedItems = { ...prev };
       if (updatedItems[itemId]) {
@@ -165,6 +167,11 @@ function OrderForm() {
       }
       return updatedItems;
     });
+    
+    // If this was the first item added to cart and cart is hidden, show the cart
+    if (wasEmpty && !isCartVisible && window.innerWidth > 768) {
+      toggleCart();
+    }
   };
   
   const handleIncreaseQuantity = (itemId) => {
@@ -532,24 +539,44 @@ function OrderForm() {
     }
   };
   
-  // Add this function to toggle cart expansion
+  // Modify the toggle cart function to work for both mobile and desktop
   const toggleCart = () => {
-    setIsCartExpanded(!isCartExpanded);
-  };
-
-  // Add this function to get the number of items in cart
-  const getCartItemCount = () => {
-    return Object.keys(selectedItems).length;
-  };
-  
-  // Add function to toggle cart visibility on mobile
-  const toggleMobileCart = () => {
-    setIsCartVisible(!isCartVisible);
-    // Add or remove a class to prevent body scrolling when cart is open
-    if (!isCartVisible) {
-      document.body.style.overflow = 'hidden';
+    const newCartVisibility = !isCartVisible;
+    setIsCartVisible(newCartVisibility);
+    
+    // Add or remove a class from the body to help with CSS targeting
+    if (newCartVisibility) {
+      document.body.classList.add('cart-expanded');
+      document.body.classList.remove('cart-collapsed');
     } else {
-      document.body.style.overflow = '';
+      document.body.classList.remove('cart-expanded');
+      document.body.classList.add('cart-collapsed');
+    }
+    
+    // Adjust the left panel width when toggling cart visibility on desktop
+    if (window.innerWidth > 768) {
+      if (newCartVisibility) {
+        // Cart is being shown, resize items section to 70%
+        setLeftPanelWidth(70);
+      } else {
+        // Cart is being hidden, expand items section to 100%
+        setLeftPanelWidth(100);
+        // Force the right panel to be completely removed from layout
+        if (rightPanelRef.current) {
+          rightPanelRef.current.style.position = 'absolute';
+          rightPanelRef.current.style.right = '-9999px';
+          rightPanelRef.current.style.width = '0';
+        }
+      }
+    }
+    
+    // Mobile specific behavior
+    if (window.innerWidth <= 768) {
+      if (newCartVisibility) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
     }
   };
 
@@ -557,9 +584,27 @@ function OrderForm() {
   useEffect(() => {
     return () => {
       document.body.style.overflow = '';
+      document.body.classList.remove('cart-expanded');
+      document.body.classList.remove('cart-collapsed');
     };
   }, []);
 
+  // Set initial cart class on the body when component mounts
+  useEffect(() => {
+    if (isCartVisible) {
+      document.body.classList.add('cart-expanded');
+      document.body.classList.remove('cart-collapsed');
+    } else {
+      document.body.classList.remove('cart-expanded');
+      document.body.classList.add('cart-collapsed');
+    }
+  }, [isCartVisible]);
+
+  // Add this function to get the number of items in cart
+  const getCartItemCount = () => {
+    return Object.keys(selectedItems).length;
+  };
+  
   // Get total items count
   const getTotalItemsCount = () => {
     return Object.values(selectedItems).reduce((total, item) => total + item.quantity, 0);
@@ -592,12 +637,14 @@ function OrderForm() {
         <div 
           className="items-section" 
           ref={leftPanelRef}
-          style={{ width: `${leftPanelWidth}%` }}
+          style={{ 
+            width: isCartVisible ? `${leftPanelWidth}%` : '100%',
+            flex: isCartVisible ? `0 0 ${leftPanelWidth}%` : '1 0 100%'
+          }}
         >
           <div className="filter-bar">
-            {/* Filter Controls */}
-            <div className="mb-2">
-              <div className="d-flex align-items-center mb-1">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <div className="d-flex align-items-center">
                 <button 
                   className={`btn btn-sm ${filterType === 'supplier' ? 'btn-primary' : 'btn-outline-primary'} me-1`}
                   onClick={() => handleFilterTypeChange('supplier')}
@@ -612,78 +659,92 @@ function OrderForm() {
                 </button>
               </div>
               
-              {filterType === 'supplier' ? (
-                <div className="btn-group mb-2 flex-wrap" role="group">
-                  <button
-                    className={`btn btn-sm ${filter === 'all' ? 'btn-success' : 'btn-outline-success'}`}
-                    onClick={() => setFilter('all')}
-                  >
-                    Tutti
-                  </button>
-                  {suppliers.map(supplier => (
-                    <button
-                      key={supplier._id}
-                      className={`btn btn-sm ${filter === supplier._id ? 'btn-success' : 'btn-outline-success'} text-truncate`}
-                      onClick={() => setFilter(supplier._id)}
-                      style={{ 
-                        borderLeft: `3px solid ${getSupplierColor(supplier._id)}`,
-                        borderTopLeftRadius: 0,
-                        borderBottomLeftRadius: 0,
-                        maxWidth: '120px',
-                        position: 'relative'
-                      }}
-                      title={supplier.name}
-                    >
-                      {supplier.name}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="btn-group mb-2 flex-wrap" role="group">
-                  <button
-                    className={`btn btn-sm ${filter === 'all' ? 'btn-success' : 'btn-outline-success'}`}
-                    onClick={() => setFilter('all')}
-                  >
-                    Tutte
-                  </button>
-                  {categories.map(category => (
-                    <button
-                      key={category._id}
-                      className={`btn btn-sm ${filter === category._id ? 'btn-success' : 'btn-outline-success'} text-truncate`}
-                      onClick={() => setFilter(category._id)}
-                      style={{ 
-                        maxWidth: '120px',
-                        position: 'relative'
-                      }}
-                      title={category.name}
-                    >
-                      {category.name}
-                    </button>
-                  ))}
-                </div>
+              {/* Desktop Cart Toggle Button - only in the header when cart is visible */}
+              {isCartVisible && (
+                <button 
+                  className="btn btn-sm btn-outline-primary desktop-cart-toggle"
+                  onClick={toggleCart}
+                >
+                  <i className="bi bi-cart me-1"></i>
+                  Nascondi Carrello
+                  {getTotalItemsCount() > 0 && (
+                    <span className="ms-1 badge bg-danger">{getTotalItemsCount()}</span>
+                  )}
+                </button>
               )}
             </div>
             
-            <div className="search-container mt-1">
-              <div className="input-group input-group-sm">
-                <span className="input-group-text"><i className="bi bi-search"></i></span>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Cerca articoli..."
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                />
-                {searchTerm && (
-                  <button 
-                    className="btn btn-outline-secondary" 
-                    type="button"
-                    onClick={() => setSearchTerm('')}
+            {filterType === 'supplier' ? (
+              <div className="btn-group mb-2 flex-wrap" role="group">
+                <button
+                  className={`btn btn-sm ${filter === 'all' ? 'btn-success' : 'btn-outline-success'}`}
+                  onClick={() => setFilter('all')}
+                >
+                  Tutti
+                </button>
+                {suppliers.map(supplier => (
+                  <button
+                    key={supplier._id}
+                    className={`btn btn-sm ${filter === supplier._id ? 'btn-success' : 'btn-outline-success'} text-truncate`}
+                    onClick={() => setFilter(supplier._id)}
+                    style={{ 
+                      borderLeft: `3px solid ${getSupplierColor(supplier._id)}`,
+                      borderTopLeftRadius: 0,
+                      borderBottomLeftRadius: 0,
+                      maxWidth: '120px',
+                      position: 'relative'
+                    }}
+                    title={supplier.name}
                   >
-                    <i className="bi bi-x"></i>
+                    {supplier.name}
                   </button>
-                )}
+                ))}
               </div>
+            ) : (
+              <div className="btn-group mb-2 flex-wrap" role="group">
+                <button
+                  className={`btn btn-sm ${filter === 'all' ? 'btn-success' : 'btn-outline-success'}`}
+                  onClick={() => setFilter('all')}
+                >
+                  Tutte
+                </button>
+                {categories.map(category => (
+                  <button
+                    key={category._id}
+                    className={`btn btn-sm ${filter === category._id ? 'btn-success' : 'btn-outline-success'} text-truncate`}
+                    onClick={() => setFilter(category._id)}
+                    style={{ 
+                      maxWidth: '120px',
+                      position: 'relative'
+                    }}
+                    title={category.name}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <div className="search-container mt-1">
+            <div className="input-group input-group-sm">
+              <span className="input-group-text"><i className="bi bi-search"></i></span>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Cerca articoli..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+              />
+              {searchTerm && (
+                <button 
+                  className="btn btn-outline-secondary" 
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                >
+                  <i className="bi bi-x"></i>
+                </button>
+              )}
             </div>
           </div>
           
@@ -729,15 +790,18 @@ function OrderForm() {
               </div>
             )}
           </div>
-          
-          <div className="resize-handle" onMouseDown={handleMouseDown} />
         </div>
         
         <div 
-          className={`selected-section ${isCartVisible ? 'expanded' : ''}`}
+          className={`selected-section ${isCartVisible ? 'expanded' : 'collapsed'}`}
           ref={rightPanelRef}
-          style={{ width: `${100 - leftPanelWidth}%` }}
+          style={{ 
+            width: isCartVisible ? `${100 - leftPanelWidth}%` : '0%',
+            flex: isCartVisible ? `0 0 ${100 - leftPanelWidth}%` : '0'
+          }}
         >
+          {isCartVisible && <div className="resize-handle" onMouseDown={handleMouseDown} />}
+          
           <div className="selected-section-header">
             <div className="d-flex align-items-center">
               <h3 className="mb-0">
@@ -761,7 +825,8 @@ function OrderForm() {
               </div>
               <i 
                 className="bi bi-x-lg close-cart" 
-                onClick={toggleMobileCart}
+                onClick={toggleCart}
+                title="Chiudi carrello"
               ></i>
             </div>
           </div>
@@ -855,20 +920,34 @@ function OrderForm() {
             })}
           </div>
 
-          <div className="order-button-container">
-            <button
-              className="btn btn-primary order-button"
-              onClick={handleSubmit}
-            >
-              <i className="bi bi-send" />
-              <span>Invia Ordine</span>
-            </button>
-          </div>
+          {isCartVisible && (
+            <div className="order-button-container">
+              <button
+                className="btn btn-primary order-button"
+                onClick={handleSubmit}
+              >
+                <i className="bi bi-send" />
+                <span>Invia Ordine</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Mobile cart button */}
-      <div className="mobile-cart-button" onClick={toggleMobileCart}>
+      {/* Mobile cart button - only visible on mobile */}
+      <div className="mobile-cart-button" onClick={toggleCart}>
+        <i className="bi bi-cart-fill"></i>
+        {getTotalItemsCount() > 0 && (
+          <div className="cart-count">{getTotalItemsCount()}</div>
+        )}
+      </div>
+      
+      {/* Desktop fixed cart button - visible when cart is collapsed */}
+      <div 
+        className={`desktop-fixed-cart-button ${!isCartVisible ? 'visible' : ''}`} 
+        onClick={toggleCart}
+        title="Mostra Carrello"
+      >
         <i className="bi bi-cart-fill"></i>
         {getTotalItemsCount() > 0 && (
           <div className="cart-count">{getTotalItemsCount()}</div>

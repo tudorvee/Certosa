@@ -12,34 +12,51 @@
   display: flex;
   height: 100%;
   position: relative;
+  width: 100%;
+  overflow: hidden;
 }
 
 .items-section {
   position: relative;
   overflow-y: auto;
   padding: 15px;
-  transition: none;
+  transition: width 0.3s ease;
+  width: 100%; /* Default to 100% width */
+  flex: 1; /* Add flex:1 to expand to available space */
 }
 
 .selected-section {
   position: relative;
-  overflow-y: hidden; /* Change from auto to hidden */
+  overflow-y: hidden;
   padding: 15px;
-  padding-bottom: 0; /* Remove bottom padding */
+  padding-bottom: 0;
   display: flex;
   flex-direction: column;
-  transition: none;
+  transition: width 0.3s ease, opacity 0.2s ease;
+  height: 100%;
+}
+
+.selected-section.collapsed {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border-left: none !important;
+  opacity: 0 !important;
+  flex: 0 !important; /* No flex space allocation when collapsed */
+  display: none !important; /* Hide completely */
 }
 
 .resize-handle {
   position: absolute;
   top: 0;
-  right: 0;
+  left: 0;
   bottom: 0;
-  width: 8px;
+  width: 10px;
   background-color: transparent;
   cursor: col-resize;
-  z-index: 10;
+  z-index: 15;
 }
 
 .resize-handle::after {
@@ -47,10 +64,9 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 50%;
-  width: 2px;
+  left: 0;
+  width: 4px;
   background-color: #dee2e6;
-  transform: translateX(-50%);
 }
 
 .resize-handle:hover::after {
@@ -318,8 +334,8 @@ body.resizing .resize-handle::after {
   padding: 15px;
   box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
   z-index: 100;
-  transition: all 0.3s ease;
   margin-top: auto;
+  width: 100%;
 }
 
 .order-button {
@@ -354,7 +370,7 @@ body.resizing .resize-handle::after {
     max-width: 100%;
     background: white;
     z-index: 1000;
-    transition: right 0.3s ease;
+    transition: right 0.3s ease, width 0s;
     box-shadow: -2px 0 5px rgba(0,0,0,0.2);
     display: flex;
     flex-direction: column;
@@ -362,6 +378,10 @@ body.resizing .resize-handle::after {
 
   .selected-section.expanded {
     right: 0;
+  }
+
+  .selected-section.collapsed {
+    right: -100%;
   }
 
   .order-button-container {
@@ -384,22 +404,50 @@ body.resizing .resize-handle::after {
     padding: 15px;
     padding-bottom: 80px;
   }
+
+  .desktop-cart-toggle {
+    display: none; /* Hide desktop toggle on mobile */
+  }
 }
 
-/* Ensure minimum sizes */
+/* Desktop only styles */
 @media (min-width: 769px) {
+  .mobile-cart-button {
+    display: none; /* Hide mobile cart button on desktop */
+  }
+  
   .items-section {
     min-width: 300px;
-    max-width: 70%;
-    transition: width 0.1s ease;
+    max-width: 100%;
+    transition: width 0.3s ease;
+    flex: 1 1 auto; /* Allow flex growth and shrinking */
   }
   
   .selected-section {
-    min-width: 300px;
-    max-width: 70%;
-    transition: width 0.1s ease;
+    min-width: 0;
+    max-width: 30%;
+    border-left: 1px solid #dee2e6;
+    transition: width 0.3s ease, opacity 0.2s ease;
+    flex: 0 0 auto; /* Don't grow or shrink */
   }
-
+  
+  .selected-section.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    border-left: none !important;
+    opacity: 0 !important;
+    flex: 0 !important;
+    display: none !important;
+  }
+  
+  .selected-section.expanded {
+    opacity: 1;
+    min-width: 300px;
+  }
+  
   .order-content {
     display: flex;
     flex-direction: row;
@@ -407,6 +455,33 @@ body.resizing .resize-handle::after {
     flex: 1;
     overflow: hidden;
     position: relative;
+  }
+  
+  .resize-handle {
+    display: none; /* Hide by default */
+  }
+  
+  .selected-section.expanded .resize-handle {
+    display: block; /* Show only when cart is expanded */
+  }
+  
+  /* Additional strong override for desktop media query */
+  body.cart-collapsed .order-content {
+    display: block !important;
+  }
+  
+  body.cart-collapsed .items-section {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+  
+  body.cart-collapsed .selected-section {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    flex: 0 0 0px !important;
   }
 }
 
@@ -626,10 +701,72 @@ body.resizing .resize-handle::after {
   font-weight: bold;
 }
 
-/* Show mobile cart button only on mobile */
-@media (max-width: 768px) {
+/* Desktop fixed cart button styles */
+.desktop-fixed-cart-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: #0d6efd;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  color: white;
+  display: none; /* Hidden by default */
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 1050; /* Increase z-index to ensure visibility */
+  font-size: 1.5rem;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Show when visible class is applied and not in mobile */
+.desktop-fixed-cart-button.visible {
+  display: flex !important; /* Use !important to override other rules */
+}
+
+.desktop-fixed-cart-button:hover {
+  background-color: #0b5ed7;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.desktop-fixed-cart-button:active {
+  transform: translateY(0px);
+}
+
+.desktop-fixed-cart-button .cart-count {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #dc3545;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+/* Desktop only styles */
+@media (min-width: 769px) {
   .mobile-cart-button {
-    display: flex;
+    display: none; /* Hide mobile cart button on desktop */
+  }
+}
+
+/* Mobile only styles */
+@media (max-width: 768px) {
+  .desktop-fixed-cart-button {
+    display: none !important; /* Always hide on mobile */
+  }
+  
+  .mobile-cart-button {
+    display: flex; /* Show mobile button */
   }
 }
 
@@ -649,4 +786,51 @@ body.resizing .resize-handle::after {
   font-size: 24px;
   cursor: pointer;
   padding: 5px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.selected-section-header .close-cart:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Add styles for the desktop cart toggle button */
+.desktop-cart-toggle {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.desktop-cart-toggle .badge {
+  margin-left: 5px;
+}
+
+/* Override item-section width in JS */
+.selected-section.collapsed + .items-section,
+.items-section:only-child {
+  width: 100% !important;
+  flex: 1 1 100% !important;
+  max-width: 100% !important;
+}
+
+/* Body class targets for cart state */
+body.cart-collapsed .order-content {
+  display: block !important;
+  overflow: visible !important;
+}
+
+body.cart-collapsed .items-section {
+  width: 100% !important;
+  flex: 1 1 auto !important;
+  max-width: 100% !important;
+  margin-right: 0 !important;
+}
+
+body.cart-collapsed .selected-section {
+  display: none !important;
+  width: 0 !important;
+  max-width: 0 !important;
+  flex: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 } 
