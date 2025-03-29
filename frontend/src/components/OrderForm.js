@@ -548,6 +548,13 @@ function OrderForm() {
     if (newCartVisibility) {
       document.body.classList.add('cart-expanded');
       document.body.classList.remove('cart-collapsed');
+      
+      // When showing the cart, restore its position and width
+      if (rightPanelRef.current) {
+        rightPanelRef.current.style.position = '';
+        rightPanelRef.current.style.right = '';
+        rightPanelRef.current.style.width = '';
+      }
     } else {
       document.body.classList.remove('cart-expanded');
       document.body.classList.add('cart-collapsed');
@@ -565,7 +572,6 @@ function OrderForm() {
         if (rightPanelRef.current) {
           rightPanelRef.current.style.position = 'absolute';
           rightPanelRef.current.style.right = '-9999px';
-          rightPanelRef.current.style.width = '0';
         }
       }
     }
@@ -771,6 +777,10 @@ function OrderForm() {
                     <h5 className="item-name" title={item.name}>{item.name}</h5>
                   </div>
                   
+                  <div className="item-unit-corner">
+                    <small>{item.unit}</small>
+                  </div>
+                  
                   {selectedItems[item._id] && (
                     <div className="item-quantity-badge">
                       {selectedItems[item._id].quantity}
@@ -875,20 +885,29 @@ function OrderForm() {
                       <div className="quantity-controls">
                         <button 
                           className="btn btn-sm btn-outline-secondary" 
-                          onClick={() => handleDecreaseQuantity(item._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDecreaseQuantity(item._id);
+                          }}
                         >
                           -
                         </button>
                         <span className="quantity">{selectedItems[item._id].quantity}</span>
                         <button 
                           className="btn btn-sm btn-outline-secondary" 
-                          onClick={() => handleIncreaseQuantity(item._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleIncreaseQuantity(item._id);
+                          }}
                         >
                           +
                         </button>
                         <button 
                           className="btn btn-sm btn-danger" 
-                          onClick={() => handleRemoveItem(item._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveItem(item._id);
+                          }}
                         >
                           <i className="bi bi-trash"></i>
                         </button>
@@ -920,17 +939,15 @@ function OrderForm() {
             })}
           </div>
 
-          {isCartVisible && (
-            <div className="order-button-container">
-              <button
-                className="btn btn-primary order-button"
-                onClick={handleSubmit}
-              >
-                <i className="bi bi-send" />
-                <span>Invia Ordine</span>
-              </button>
-            </div>
-          )}
+          <div className="order-button-container">
+            <button
+              className="btn btn-primary order-button"
+              onClick={handleSubmit}
+            >
+              <i className="bi bi-send" />
+              <span>Invia Ordine</span>
+            </button>
+          </div>
         </div>
       </div>
 
