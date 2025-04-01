@@ -26,6 +26,8 @@ function OrderForm() {
   const [leftPanelWidth, setLeftPanelWidth] = useState(100); // Start with items section at 100%
   const [isCartVisible, setIsCartVisible] = useState(false); // Cart starts hidden
   const [itemsBySupplier, setItemsBySupplier] = useState({});
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef(null);
   
   // Add clearCart function
   const clearCart = () => {
@@ -314,9 +316,10 @@ function OrderForm() {
   };
   
   // Toggle between filtering by supplier or by category
-  const handleFilterTypeChange = (type) => {
-    setFilterType(type);
-    setFilter('all'); // Reset filter when changing filter type
+  const handleFilterTypeChange = () => {
+    const newType = filterType === 'supplier' ? 'category' : 'supplier';
+    setFilterType(newType);
+    setFilter('all'); // Reset filter when changing type
   };
   
   // Get filtered items based on current filter settings
@@ -627,6 +630,105 @@ function OrderForm() {
     'Saturday': 'Sabato'
   };
   
+  const renderFilterToggle = () => {
+    return (
+      <div className="filter-toggle-wrapper">
+        <button 
+          className={`filter-toggle ${filterType === 'category' ? 'category' : ''}`}
+          onClick={handleFilterTypeChange}
+        >
+          <div className="toggle-text">
+            {filterType === 'supplier' ? 'Fornitore' : 'Categoria'}
+          </div>
+          <div className="toggle-slider"></div>
+        </button>
+        
+        <div className={`search-container ${isSearchExpanded ? 'expanded' : 'collapsed'}`}>
+          <button className="search-button" onClick={toggleSearch}>
+            <i className="bi bi-search"></i>
+          </button>
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Cerca articoli..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            style={{ 
+              opacity: isSearchExpanded ? 1 : 0,
+              pointerEvents: isSearchExpanded ? 'auto' : 'none'
+            }}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const renderFilterButtons = () => {
+    const data = filterType === 'supplier' ? suppliers : categories;
+    
+    return (
+      <div className="filter-scroll-container">
+        <button
+          key="all"
+          className={`filter-button ${filter === 'all' ? 'active' : ''} ${filterType === 'category' ? 'category' : ''}`}
+          onClick={() => setFilter('all')}
+        >
+          Tutti
+        </button>
+        {data.map(item => (
+          <button
+            key={item._id}
+            className={`filter-button ${filter === item._id ? 'active' : ''} ${filterType === 'category' ? 'category' : ''}`}
+            onClick={() => setFilter(item._id)}
+          >
+            {item.name}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  // Add this function to handle search button click
+  const toggleSearch = () => {
+    setIsSearchExpanded(!isSearchExpanded);
+    if (!isSearchExpanded) {
+      // Focus the input when expanding
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    } else {
+      // Clear search when collapsing
+      setSearchTerm('');
+    }
+  };
+
+  // Add click outside handler to collapse search
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isSearchExpanded && 
+          searchInputRef.current && 
+          !searchInputRef.current.contains(event.target) &&
+          !event.target.closest('.search-button')) {
+        setIsSearchExpanded(false);
+        setSearchTerm('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSearchExpanded]);
+
+  const renderFilterSection = () => {
+    return (
+      <div className="filter-section">
+        {renderFilterToggle()}
+        {renderFilterButtons()}
+      </div>
+    );
+  };
+
   if (loading) {
     return <div className="text-center my-3"><div className="spinner-border" role="status"></div></div>;
   }
@@ -641,128 +743,16 @@ function OrderForm() {
       
       <div className="order-content" ref={containerRef}>
         <div 
-          className="items-section" 
+          className={`left-content ${isCartVisible ? 'with-cart' : ''}`}
           ref={leftPanelRef}
           style={{ 
             width: isCartVisible ? `${leftPanelWidth}%` : '100%',
             flex: isCartVisible ? `0 0 ${leftPanelWidth}%` : '1 0 100%'
           }}
         >
-          <div className="filter-bar">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <div className="d-flex align-items-center">
-                <button 
-                  className={`btn btn-sm ${filterType === 'supplier' ? 'btn-primary' : 'btn-outline-primary'} me-1`}
-                  onClick={() => handleFilterTypeChange('supplier')}
-                >
-                  Filtra per Fornitore
-                </button>
-                <button 
-                  className={`btn btn-sm ${filterType === 'category' ? 'btn-primary' : 'btn-outline-primary'} me-1`}
-                  onClick={() => handleFilterTypeChange('category')}
-                >
-                  Filtra per Categoria
-                </button>
-              </div>
-              
-              {/* Desktop Cart Toggle Button - only in the header when cart is visible */}
-              {isCartVisible && (
-                <button 
-                  className="btn btn-sm btn-outline-primary desktop-cart-toggle"
-                  onClick={toggleCart}
-                >
-                  <i className="bi bi-cart me-1"></i>
-                  Nascondi Carrello
-                  {getTotalItemsCount() > 0 && (
-                    <span className="ms-1 badge bg-danger">{getTotalItemsCount()}</span>
-                  )}
-                </button>
-              )}
-            </div>
-            
-            {filterType === 'supplier' ? (
-              <div className="btn-group mb-2 flex-wrap" role="group">
-                <button
-                  className={`btn btn-sm ${filter === 'all' ? 'btn-success' : 'btn-outline-success'}`}
-                  onClick={() => setFilter('all')}
-                >
-                  Tutti
-                </button>
-                {suppliers.map(supplier => (
-                  <button
-                    key={supplier._id}
-                    className={`btn btn-sm ${filter === supplier._id ? 'btn-success' : 'btn-outline-success'} text-truncate`}
-                    onClick={() => setFilter(supplier._id)}
-                    style={{ 
-                      borderLeft: `3px solid ${getSupplierColor(supplier._id)}`,
-                      borderTopLeftRadius: 0,
-                      borderBottomLeftRadius: 0,
-                      maxWidth: '120px',
-                      position: 'relative'
-                    }}
-                    title={supplier.name}
-                  >
-                    {supplier.name}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="btn-group mb-2 flex-wrap" role="group">
-                <button
-                  className={`btn btn-sm ${filter === 'all' ? 'btn-success' : 'btn-outline-success'}`}
-                  onClick={() => setFilter('all')}
-                >
-                  Tutte
-                </button>
-                {categories.map(category => (
-                  <button
-                    key={category._id}
-                    className={`btn btn-sm ${filter === category._id ? 'btn-success' : 'btn-outline-success'} text-truncate`}
-                    onClick={() => setFilter(category._id)}
-                    style={{ 
-                      maxWidth: '120px',
-                      position: 'relative'
-                    }}
-                    title={category.name}
-                  >
-                    {category.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {renderFilterSection()}
           
-          <div className="search-container mt-1">
-            <div className="input-group input-group-sm">
-              <span className="input-group-text"><i className="bi bi-search"></i></span>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Cerca articoli..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-              />
-              {searchTerm && (
-                <button 
-                  className="btn btn-outline-secondary" 
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                >
-                  <i className="bi bi-x"></i>
-                </button>
-              )}
-            </div>
-          </div>
           
-          <div className="filter-summary mt-1 mb-2">
-            <small className="text-muted">
-              {searchTerm ? 
-                `${getFilteredItems().length} risultati trovati per "${searchTerm}"` : 
-                `${getFilteredItems().length} articoli disponibili per ${getCurrentDayInItalian()}`
-              }
-              {filter !== 'all' && ` (Filtrati per ${filterType === 'supplier' ? 'fornitore: ' + suppliers.find(s => s._id === filter)?.name : 'categoria: ' + categories.find(c => c._id === filter)?.name})`}
-            </small>
-          </div>
           
           <div className="items-grid">
             {getFilteredItems().length > 0 ? (
