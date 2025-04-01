@@ -174,6 +174,9 @@ function OrderForm() {
     if (wasEmpty && !isCartVisible && window.innerWidth > 768) {
       toggleCart();
     }
+    
+    // Keep search expanded and don't clear search term when selecting an item
+    // This ensures that the search results stay visible
   };
   
   const handleIncreaseQuantity = (itemId) => {
@@ -697,7 +700,8 @@ function OrderForm() {
         searchInputRef.current?.focus();
       }, 100);
     } else {
-      // Clear search when collapsing
+      // Only clear search when collapsing manually
+      // Don't clear when clicking on an item
       setSearchTerm('');
     }
   };
@@ -708,7 +712,8 @@ function OrderForm() {
       if (isSearchExpanded && 
           searchInputRef.current && 
           !searchInputRef.current.contains(event.target) &&
-          !event.target.closest('.search-button')) {
+          !event.target.closest('.search-button') &&
+          !event.target.closest('.item-card')) {  // Don't close when clicking on an item
         setIsSearchExpanded(false);
         setSearchTerm('');
       }
