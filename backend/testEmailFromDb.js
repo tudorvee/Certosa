@@ -32,7 +32,9 @@ async function testEmailFromDb() {
       smtpHost: restaurant.emailConfig.smtpHost,
       smtpPort: restaurant.emailConfig.smtpPort,
       smtpUser: restaurant.emailConfig.smtpUser,
-      useSsl: restaurant.emailConfig.useSsl
+      useSsl: restaurant.emailConfig.useSsl,
+      // Show password length but not actual password
+      passwordLength: restaurant.emailConfig.smtpPassword ? restaurant.emailConfig.smtpPassword.length : 0
     });
     
     // Create transporter with restaurant config

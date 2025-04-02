@@ -9,7 +9,7 @@ const emailConfig = {
   smtpHost: 'smtp.gmail.com',
   smtpPort: 587,
   smtpUser: 'ristorantepancrazio@gmail.com',
-  smtpPassword: 'jcesqbuhocfgawhs',  // New App Password
+  smtpPassword: 'qguhsnaatdmqwkuz',  // New App Password
   useSsl: false
 };
 

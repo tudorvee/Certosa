@@ -7,7 +7,7 @@ const createDirectTransporter = async () => {
   
   // Gmail app password
   const EMAIL_USER = 'ristorantepancrazio@gmail.com';
-  const APP_PASSWORD = 'jcesqbuhocfgawhs';
+  const APP_PASSWORD = 'qguhsnaatdmqwkuz';
   
   console.log(`Using Gmail account: ${EMAIL_USER}`);
   console.log(`Using app password: ${'*'.repeat(APP_PASSWORD.length)}`);

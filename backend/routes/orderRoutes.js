@@ -70,6 +70,75 @@ router.post('/emergency-test-note', async (req, res) => {
   }
 });
 
+// Add a simple test route that doesn't require authentication 
+// This must be before the middleware to bypass auth
+router.get('/test-email', async (req, res) => {
+  try {
+    console.log('🧪 Testing email functionality');
+    
+    // Create transporter directly
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+    
+    // Log authentication details (sanitized)
+    console.log('Using email credentials:');
+    console.log(`- Username: ${process.env.EMAIL_USER}`);
+    console.log(`- Password: ${process.env.EMAIL_PASS ? '*'.repeat(8) : 'not set'}`);
+    
+    // Verify connection configuration
+    try {
+      await transporter.verify();
+      console.log('SMTP connection verified successfully');
+    } catch (verifyError) {
+      console.error('SMTP verification failed:', verifyError);
+      return res.status(500).json({
+        success: false,
+        message: 'SMTP verification failed',
+        error: verifyError.message
+      });
+    }
+    
+    // Simple test email
+    const info = await transporter.sendMail({
+      from: `"Email Test" <${process.env.EMAIL_USER}>`,
+      to: process.env.EMAIL_USER, // Send to yourself
+      subject: 'Test Email ' + new Date().toISOString(),
+      text: 'This is a test email to verify email functionality is working.',
+      html: `
+        <h2>Test Email</h2>
+        <p>This is a test email sent at ${new Date().toLocaleString()}.</p>
+        <p>If you're receiving this, email sending is working correctly!</p>
+      `
+    });
+    
+    console.log('Test email sent successfully:', info.messageId);
+    
+    res.json({
+      success: true,
+      message: 'Test email sent successfully',
+      messageId: info.messageId
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send test email',
+      error: error.message
+    });
+  }
+});
+
 // Apply auth and middleware to all routes
 router.use(auth);
 router.use(restaurantFilter);
@@ -399,74 +468,6 @@ router.post('/emergency-note', isKitchen, async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Unknown error sending test email'
-    });
-  }
-});
-
-// Add a simple test route that doesn't require authentication
-router.get('/test-email', async (req, res) => {
-  try {
-    console.log('🧪 Testing email functionality');
-    
-    // Create transporter directly
-    const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      },
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-    
-    // Log authentication details (sanitized)
-    console.log('Using email credentials:');
-    console.log(`- Username: ${process.env.EMAIL_USER}`);
-    console.log(`- Password: ${process.env.EMAIL_PASS ? '*'.repeat(8) : 'not set'}`);
-    
-    // Verify connection configuration
-    try {
-      await transporter.verify();
-      console.log('SMTP connection verified successfully');
-    } catch (verifyError) {
-      console.error('SMTP verification failed:', verifyError);
-      return res.status(500).json({
-        success: false,
-        message: 'SMTP verification failed',
-        error: verifyError.message
-      });
-    }
-    
-    // Simple test email
-    const info = await transporter.sendMail({
-      from: `"Email Test" <${process.env.EMAIL_USER}>`,
-      to: process.env.EMAIL_USER, // Send to yourself
-      subject: 'Test Email ' + new Date().toISOString(),
-      text: 'This is a test email to verify email functionality is working.',
-      html: `
-        <h2>Test Email</h2>
-        <p>This is a test email sent at ${new Date().toLocaleString()}.</p>
-        <p>If you're receiving this, email sending is working correctly!</p>
-      `
-    });
-    
-    console.log('Test email sent successfully:', info.messageId);
-    
-    res.json({
-      success: true,
-      message: 'Test email sent successfully',
-      messageId: info.messageId
-    });
-  } catch (error) {
-    console.error('Test email error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send test email',
-      error: error.message
     });
   }
 });

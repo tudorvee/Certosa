@@ -4,7 +4,7 @@ const nodemailer = require('nodemailer');
 async function testEmailSending() {
   // Hard-code credentials for testing
   const EMAIL_USER = 'ristorantepancrazio@gmail.com';
-  const APP_PASSWORD = 'jcesqbuhocfgawhs'; // App password directly
+  const APP_PASSWORD = 'qguhsnaatdmqwkuz'; // Updated App Password
 
   console.log('Testing email sending...');
   console.log('Using credentials:');
