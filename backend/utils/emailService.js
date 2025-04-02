@@ -6,18 +6,27 @@ const createDirectTransporter = async () => {
   console.log('Creating DIRECT GMAIL transporter');
   
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // use TLS
     auth: {
       user: process.env.EMAIL_USER || 'ristorantepancrazio@gmail.com',
-      pass: process.env.EMAIL_PASS || 'vupobuygcaxwpcjs'
+      pass: process.env.EMAIL_PASS  // Must be an App Password if 2FA is enabled
+    },
+    tls: {
+      rejectUnauthorized: false // Accept all certificates (for testing only)
     }
   });
   
   // Test the connection
-  const verified = await transporter.verify();
-  console.log('Transporter verified:', verified);
-  
-  return transporter;
+  try {
+    const verified = await transporter.verify();
+    console.log('Transporter verified:', verified);
+    return transporter;
+  } catch (error) {
+    console.error('Error verifying transporter:', error);
+    throw error;
+  }
 };
 
 // Super simplified email sending
