@@ -5,16 +5,18 @@ const Restaurant = require('../models/Restaurant');
 const createDirectTransporter = async () => {
   console.log('Creating DIRECT GMAIL transporter');
   
+  // Gmail app password
+  const EMAIL_USER = 'ristorantepancrazio@gmail.com';
+  const APP_PASSWORD = 'jcesqbuhocfgawhs';
+  
+  console.log(`Using Gmail account: ${EMAIL_USER}`);
+  console.log(`Using app password: ${'*'.repeat(APP_PASSWORD.length)}`);
+  
   const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // use TLS
+    service: 'gmail',
     auth: {
-      user: process.env.EMAIL_USER || 'ristorantepancrazio@gmail.com',
-      pass: process.env.EMAIL_PASS  // Must be an App Password if 2FA is enabled
-    },
-    tls: {
-      rejectUnauthorized: false // Accept all certificates (for testing only)
+      user: EMAIL_USER,
+      pass: APP_PASSWORD
     }
   });
   
