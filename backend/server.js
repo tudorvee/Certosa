@@ -35,14 +35,11 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true }));
 
 // Replace the existing mongoose.connect with this
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/kitchen-order-app-dev';
-console.log('Attempting to connect to MongoDB...');
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://certosa:7O3Noop9MhPNN0q5@cluster0.02pqg.mongodb.net/certosaDB?retryWrites=true&w=majority&appName=Cluster0';
+console.log('Attempting to connect to MongoDB Atlas...');
 
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('MongoDB connected successfully'))
+mongoose.connect(MONGODB_URI)
+.then(() => console.log('MongoDB Atlas connected successfully'))
 .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes

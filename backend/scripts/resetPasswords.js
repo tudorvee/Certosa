@@ -7,8 +7,8 @@ const User = mongoose.model('User');
 async function resetAdminPassword() {
   try {
     // Connect to production database
-    // Use your actual production MongoDB URI here
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/kitchen-order-app-prod');
+    // Use MongoDB Atlas connection
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://certosa:7O3Noop9MhPNN0q5@cluster0.02pqg.mongodb.net/certosaDB?retryWrites=true&w=majority&appName=Cluster0');
     console.log('Connected to production database');
 
     // New password for admin

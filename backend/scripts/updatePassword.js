@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 
 async function updatePassword() {
   try {
-    await mongoose.connect('mongodb://localhost:27017/kitchen-order-app-dev');
-    console.log('Connected to MongoDB');
+    await mongoose.connect('mongodb+srv://certosa:7O3Noop9MhPNN0q5@cluster0.02pqg.mongodb.net/certosaDB?retryWrites=true&w=majority&appName=Cluster0');
+    console.log('Connected to MongoDB Atlas');
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash('12345', salt);

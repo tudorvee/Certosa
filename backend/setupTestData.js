@@ -7,9 +7,9 @@ const bcrypt = require('bcryptjs');
 
 const setupTestData = async () => {
   try {
-    await mongoose.connect('mongodb://localhost:27017/certosaDB', { 
-      useNewUrlParser: true, 
-      useUnifiedTopology: true 
+    await mongoose.connect('mongodb+srv://certosa:7O3Noop9MhPNN0q5@cluster0.02pqg.mongodb.net/certosaDB?retryWrites=true&w=majority&appName=Cluster0', {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
     });
     
     console.log('Connected to database');
