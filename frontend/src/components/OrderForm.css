@@ -1,28 +1,37 @@
+/* Fix overflow and scrolling for all devices */
+html, body {
+  height: 100%;
+  position: relative;
+}
+
 .order-form-container {
   max-width: 100%;
-  height: calc(100vh - 56px); /* Account for navbar height */
+  height: 100vh; /* Full viewport height */
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Prevent scrolling on the container */
+  position: relative;
 }
 
 .order-content {
   display: flex;
-  height: 100%;
+  flex: 1;
   position: relative;
   width: 100%;
-  overflow: hidden;
 }
 
 .items-section {
   position: relative;
-  overflow-y: auto;
+  height: auto; /* Change from 100% to auto */
+  overflow-y: auto; /* Allow vertical scrolling */
   padding: 15px;
   transition: width 0.3s ease;
   width: 100%; /* Default to 100% width */
   flex: 1; /* Add flex:1 to expand to available space */
+  -webkit-overflow-scrolling: touch; /* Improve scrolling on iOS devices */
+  padding-bottom: 120px; /* Extra padding at bottom to ensure last items are visible */
+  will-change: transform; /* Hardware acceleration for smooth scrolling */
 }
 
 .selected-section {
@@ -651,14 +660,38 @@ body.resizing .resize-handle::after {
 
 /* Responsive layout adjustments */
 @media (max-width: 768px) {
+  .order-form-container {
+    height: 100vh; /* Full viewport height */
+    padding-top: 0;
+    padding-bottom: 0;
+    width: 100%;
+    overflow: visible; /* Allow scrolling */
+  }
+
   .order-content {
     flex-direction: column;
+    height: calc(100vh - 56px); /* Account for navbar */
+    overflow: visible; /* Allow scrolling */
   }
   
   .items-section {
-    max-width: 100%;
-    height: 100%;
+    height: auto;
+    max-height: none;
+    overflow-y: visible; /* Allow normal scroll behavior */
+    padding-bottom: 180px; /* Extra padding to ensure items are visible */
+    position: relative;
     width: 100% !important;
+  }
+  
+  .filter-section {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #fff;
+  }
+  
+  .items-grid {
+    padding-bottom: 120px; /* Extra space for fixed elements */
   }
   
   .selected-section {
@@ -674,6 +707,7 @@ body.resizing .resize-handle::after {
     box-shadow: -2px 0 5px rgba(0,0,0,0.2);
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
   }
 
   .selected-section.expanded {
@@ -719,8 +753,10 @@ body.resizing .resize-handle::after {
   .items-section {
     min-width: 300px;
     max-width: 100%;
-    transition: width 0.3s ease;
-    flex: 1 1 auto; /* Allow flex growth and shrinking */
+    height: auto; /* Change from fixed height to auto */
+    overflow-y: auto; /* Normal scrolling */
+    position: relative;
+    padding-bottom: 120px;
   }
   
   .selected-section {
