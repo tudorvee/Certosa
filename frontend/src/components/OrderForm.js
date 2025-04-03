@@ -29,7 +29,7 @@ function OrderForm() {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const searchInputRef = useRef(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  
+
   // Add clearCart function
   const clearCart = () => {
     setSelectedItems({});
@@ -761,43 +761,44 @@ function OrderForm() {
             flex: isCartVisible ? `0 0 ${leftPanelWidth}%` : '1 0 100%'
           }}
         >
-          {renderFilterSection()}
-          
-          <div className="items-grid">
-            {getFilteredItems().length > 0 ? (
-              getFilteredItems().map(item => (
-                <div 
-                  key={item._id} 
-                  className={`item-card ${selectedItems[item._id] ? 'selected' : ''}`}
-                  onClick={() => handleItemSelect(item._id)}
-                  style={{ backgroundColor: getCategoryColor(item.categoryId?._id) }}
-                >
-                  <div className="item-card-header">
-                    <h5 className="item-name" title={item.name}>{item.name}</h5>
-                  </div>
-                  
-                  <div className="item-unit-corner">
-                    <small>{item.unit}</small>
-                  </div>
-                  
-                  {selectedItems[item._id] && (
-                    <div className="item-quantity-badge">
-                      {selectedItems[item._id].quantity}
+          <div className="items-section">
+            {renderFilterSection()}
+            <div className="items-grid">
+              {getFilteredItems().length > 0 ? (
+                getFilteredItems().map(item => (
+                  <div 
+                    key={item._id} 
+                    className={`item-card ${selectedItems[item._id] ? 'selected' : ''}`}
+                    onClick={() => handleItemSelect(item._id)}
+                    style={{ backgroundColor: getCategoryColor(item.categoryId?._id) }}
+                  >
+                    <div className="item-card-header">
+                      <h5 className="item-name" title={item.name}>{item.name}</h5>
                     </div>
-                  )}
+                    
+                    <div className="item-unit-corner">
+                      <small>{item.unit}</small>
+                    </div>
+                    
+                    {selectedItems[item._id] && (
+                      <div className="item-quantity-badge">
+                        {selectedItems[item._id].quantity}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="no-items-found">
+                  <p className="text-center text-muted my-3">
+                    <i className="bi bi-search me-2"></i>
+                    {searchTerm ? 
+                      `Nessun articolo trovato per "${searchTerm}"` : 
+                      "Nessun articolo disponibile"
+                    }
+                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="no-items-found">
-                <p className="text-center text-muted my-3">
-                  <i className="bi bi-search me-2"></i>
-                  {searchTerm ? 
-                    `Nessun articolo trovato per "${searchTerm}"` : 
-                    "Nessun articolo disponibile"
-                  }
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
         

@@ -1,88 +1,182 @@
 /* Fix overflow and scrolling for all devices */
 html, body {
   height: 100%;
-  position: relative;
-}
-
-.order-form-container {
-  max-width: 100%;
-  height: 100vh; /* Full viewport height */
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  position: relative;
 }
 
+/* Main container */
+.order-form-container {
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent outer scrolling */
+}
+
+/* Content wrapper - horizontal layout */
 .order-content {
   display: flex;
-  flex: 1;
-  position: relative;
   width: 100%;
-}
-
-/* Independent scrolling for both sections */
-.items-section {
-  position: relative;
-  height: auto;
-  overflow-y: auto !important; /* Force vertical scrolling */
-  padding: 15px;
-  transition: width 0.3s ease;
-  width: 100%; /* Default to 100% width */
-  flex: 1; /* Add flex:1 to expand to available space */
-  -webkit-overflow-scrolling: touch; /* Improve scrolling on iOS devices */
-  padding-bottom: 120px; /* Extra padding at bottom to ensure last items are visible */
-  will-change: transform; /* Hardware acceleration for smooth scrolling */
-}
-
-.cart-section {
-  position: relative;
-  height: 100%;
-  overflow-y: auto !important; /* Always allow cart scrolling */
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 120px;
-  flex-shrink: 0;
-  width: 0;
-  transition: width 0.3s ease;
-}
-
-.cart-section.open {
-  width: 300px;
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Ensure both sections can scroll independently when cart is open */
-.order-content.cart-open .items-section, 
-.order-content.cart-open .cart-section {
   height: calc(100vh - 56px);
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 
-.selected-section {
+/* Items panel (left side) */
+.left-content {
+  flex: 1; /* Take available space */
+  overflow: hidden;
+  height: 100%;
   position: relative;
-  overflow-y: hidden;
-  padding: 15px;
-  padding-bottom: 0;
   display: flex;
   flex-direction: column;
-  transition: width 0.3s ease, opacity 0.2s ease;
+  overflow: hidden; /* Important - prevents double scroll */
+}
+
+.items-section {
+  flex: 1;
+  overflow-y: auto; /* This enables scrolling */
+  overflow-x: hidden;
   height: 100%;
+  -webkit-overflow-scrolling: touch; /* For smooth iOS scrolling */
+  padding: 0 0 100px 0; /* Extra padding at bottom for visibility */
+}
+
+.filter-section {
+  background: white;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+/* Cart panel (right side) */
+.selected-section {
+  width: 350px;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  border-left: 1px solid #dee2e6;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
 }
 
 .selected-section.collapsed {
-  width: 0 !important;
-  min-width: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  overflow: hidden !important;
-  border-left: none !important;
-  opacity: 0 !important;
-  flex: 0 !important;
-  visibility: hidden !important;
-  position: absolute !important;
-  right: -9999px !important;
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.selected-section-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  padding: 15px;
+  background: white;
+  border-bottom: 1px solid #dee2e6;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selected-items-list {
+  flex: 1;
+  overflow-y: auto;
+  height: calc(100% - 140px); /* Account for header and button */
+  padding: 15px;
+  padding-bottom: 100px; /* Extra padding to ensure last item is visible above the order button */
+  -webkit-overflow-scrolling: touch;
+}
+
+.order-button-container {
+  padding: 15px;
+  border-top: 1px solid #dee2e6;
+  background: white;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  .selected-section {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    height: 100vh;
+    z-index: 100;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .selected-section.expanded {
+    transform: translateX(0);
+  }
+
+  .mobile-cart-button {
+    display: flex;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #0d6efd;
+    color: white;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 99;
+    cursor: pointer;
+  }
+
+  .desktop-fixed-cart-button {
+    display: none !important;
+  }
+
+  .items-section {
+    overflow-y: auto !important; /* Force scroll on mobile */
+  }
+  
+  .selected-items-list {
+    height: calc(100% - 140px);
+    overflow-y: auto !important;
+    padding-bottom: 120px; /* Even more padding on mobile */
+  }
+}
+
+/* Desktop styles */
+@media (min-width: 769px) {
+  .mobile-cart-button {
+    display: none;
+  }
+  
+  .desktop-fixed-cart-button.visible {
+    display: flex !important;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #0d6efd;
+    color: white;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 99;
+    cursor: pointer;
+  }
 }
 
 .resize-handle {
@@ -127,20 +221,41 @@ body.resizing .resize-handle::after {
   }
   
   /* Adjust cart positioning for mobile */
-  .order-content.cart-open .items-section {
-    height: calc(100vh - 56px);
-    overflow-y: auto !important;
+  .selected-section {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: white;
+    height: 100%; /* Full screen height */
+    width: 100% !important;
+    max-height: 100vh;
+    overflow-y: scroll !important;
     -webkit-overflow-scrolling: touch;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
   }
-}
-
-.filter-section {
-  padding: 0;
-  margin: 0;
-  width: 100%;
-  background: #fff;
-  border-bottom: 1px solid #e9ecef;
-  position: relative;
+  
+  .selected-section.expanded {
+    transform: translateY(0);
+    width: 100% !important;
+  }
+  
+  /* Make the header more prominent on mobile full screen */
+  .selected-section-header {
+    padding: 15px 10px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+  }
+  
+  /* Add a back button style for mobile */
+  .close-cart {
+    font-size: 1.2rem;
+    padding: 5px;
+    cursor: pointer;
+  }
 }
 
 .filter-toggle-wrapper {
@@ -434,7 +549,7 @@ body.resizing .resize-handle::after {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 8px;
-  margin-top: 10px;
+  padding: 15px;
 }
 
 .item-card {
@@ -589,13 +704,6 @@ body.resizing .resize-handle::after {
   font-weight: 600;
 }
 
-.selected-items-list {
-  flex: 1;
-  overflow-y: auto;
-  padding-right: 5px;
-  padding-bottom: 100px; /* Increased space for the button */
-}
-
 .selected-item-row {
   display: flex;
   justify-content: space-between;
@@ -667,19 +775,6 @@ body.resizing .resize-handle::after {
   height: 28px;
 }
 
-.order-button-container {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: white;
-  padding: 15px;
-  box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
-  z-index: 100;
-  margin-top: auto;
-  width: 100%;
-}
-
 .order-button {
   width: 100%;
   height: 50px;
@@ -698,75 +793,62 @@ body.resizing .resize-handle::after {
     padding-top: 0;
     padding-bottom: 0;
     width: 100%;
-    overflow: visible; /* Allow scrolling */
   }
 
   .order-content {
     flex-direction: column;
     height: calc(100vh - 56px); /* Account for navbar */
-    overflow: visible; /* Allow scrolling */
+  }
+  
+  .left-content {
+    width: 100% !important;
+    flex: 1 !important;
+    overflow: hidden; /* Hide overflow at wrapper level */
   }
   
   .items-section {
-    height: auto;
-    overflow-y: visible; /* Allow normal scroll behavior */
+    height: 100%;
+    overflow-y: scroll !important; /* Force scrolling */
+    -webkit-overflow-scrolling: touch;
     padding-bottom: 180px; /* Extra padding to ensure items are visible */
     position: relative;
     width: 100% !important;
   }
   
-  .cart-section {
+  .selected-section {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     z-index: 1000;
     background: white;
-    height: 50%; /* Half the screen height */
+    height: 100%; /* Full screen height */
     width: 100% !important;
-    max-height: 70vh;
-    overflow-y: auto !important;
+    max-height: 100vh;
+    overflow-y: scroll !important;
     -webkit-overflow-scrolling: touch;
     transform: translateY(100%);
     transition: transform 0.3s ease;
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
   }
   
-  .cart-section.open {
+  .selected-section.expanded {
     transform: translateY(0);
     width: 100% !important;
   }
   
-  .filter-section {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: #fff;
+  /* Make the header more prominent on mobile full screen */
+  .selected-section-header {
+    padding: 15px 10px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
   }
   
-  /* Fix for iOS momentum scrolling */
-  .items-grid {
-    padding-bottom: 120px; /* Extra space for fixed elements */
-  }
-  
-  .selected-section {
-    position: fixed;
-    top: 0;
-    right: -100%;
-    width: 100% !important;
-    height: 100vh;
-    max-width: 100%;
-    background: white;
-    z-index: 1000;
-    transition: right 0.3s ease, width 0s;
-    box-shadow: -2px 0 5px rgba(0,0,0,0.2);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-  }
-
-  .selected-section.expanded {
-    right: 0;
+  /* Add a back button style for mobile */
+  .close-cart {
+    font-size: 1.2rem;
+    padding: 5px;
+    cursor: pointer;
   }
 
   .selected-section.collapsed {
@@ -808,12 +890,6 @@ body.resizing .resize-handle::after {
     overflow-y: auto !important; /* Normal scrolling */
     position: relative;
     padding-bottom: 120px;
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  .cart-section {
-    height: calc(100vh - 56px);
-    overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
   }
   
@@ -1172,11 +1248,11 @@ body.resizing .resize-handle::after {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px;
+  padding: 10px 0;
   border-bottom: 1px solid #dee2e6;
-  background: white;
   position: sticky;
   top: 0;
+  background: white;
   z-index: 10;
 }
 
