@@ -28,6 +28,7 @@ function OrderForm() {
   const [itemsBySupplier, setItemsBySupplier] = useState({});
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const searchInputRef = useRef(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   
   // Add clearCart function
   const clearCart = () => {
@@ -549,6 +550,7 @@ function OrderForm() {
   const toggleCart = () => {
     const newCartVisibility = !isCartVisible;
     setIsCartVisible(newCartVisibility);
+    setIsCartOpen(newCartVisibility); // Update isCartOpen state for CSS classes
     
     // Add or remove a class from the body to help with CSS targeting
     if (newCartVisibility) {
@@ -734,6 +736,10 @@ function OrderForm() {
     );
   };
 
+  const toggleCartVisibility = () => {
+    setIsCartOpen(!isCartOpen);
+  };
+
   if (loading) {
     return <div className="text-center my-3"><div className="spinner-border" role="status"></div></div>;
   }
@@ -746,7 +752,7 @@ function OrderForm() {
         </div>
       )}
       
-      <div className="order-content" ref={containerRef}>
+      <div className={`order-content ${isCartOpen ? 'cart-open' : ''}`} ref={containerRef}>
         <div 
           className={`left-content ${isCartVisible ? 'with-cart' : ''}`}
           ref={leftPanelRef}
@@ -756,8 +762,6 @@ function OrderForm() {
           }}
         >
           {renderFilterSection()}
-          
-          
           
           <div className="items-grid">
             {getFilteredItems().length > 0 ? (
