@@ -3,6 +3,19 @@ import { apiCall } from '../utils/apiUtils';
 import { AuthContext } from '../context/AuthContext';
 import Papa from 'papaparse';
 
+// Animation styles
+const modalAnimationStyles = `
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+`;
+
 function ItemManagement() {
   const [items, setItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -43,6 +56,8 @@ function ItemManagement() {
   const [showInactiveItems, setShowInactiveItems] = useState(false);
   const [inactiveItems, setInactiveItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showOnlySelected, setShowOnlySelected] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   
   // Add state for active tab
   const [activeTab, setActiveTab] = useState('list');
@@ -119,6 +134,7 @@ function ItemManagement() {
         setMessage('Articolo aggiornato con successo!');
         setEditMode(false);
         setEditingItemId(null);
+        setShowEditModal(false);
       } else {
         // Create new item
         response = await apiCall('/api/items', 'post', itemForm);
@@ -157,7 +173,7 @@ function ItemManagement() {
     });
     setEditMode(true);
     setEditingItemId(item._id);
-    setActiveTab('add');
+    setShowEditModal(true);
   };
   
   const handleCancel = () => {
@@ -171,6 +187,7 @@ function ItemManagement() {
     });
     setEditMode(false);
     setEditingItemId(null);
+    setShowEditModal(false);
   };
   
   const checkItemUsage = async (itemId) => {
@@ -606,12 +623,18 @@ function ItemManagement() {
   };
 
   // Filter items based on search term
-  const filteredItems = items.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (item.supplierId?.name && item.supplierId.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (item.categoryId?.name && item.categoryId.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredItems = items.filter(item => {
+    // First check if we're showing only selected items
+    if (showOnlySelected && !selectedItems[item._id]) {
+      return false;
+    }
+    
+    // Then apply text search filter
+    return item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (item.supplierId?.name && item.supplierId.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (item.categoryId?.name && item.categoryId.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  });
   
   const handleDayToggle = (day) => {
     setItemForm(prev => ({
@@ -628,6 +651,9 @@ function ItemManagement() {
   
   return (
     <div className="container-fluid px-0">
+      {/* Add the style tag for animations */}
+      <style>{modalAnimationStyles}</style>
+      
       {message && (
         <div className={`alert ${message.includes('successo') ? 'alert-success' : 'alert-danger'} alert-dismissible fade show mb-3`}>
           {message}
@@ -725,9 +751,29 @@ function ItemManagement() {
                 <small className="text-muted">
                   {searchTerm ? 
                     `${filteredItems.length} risultati trovati per "${searchTerm}"` : 
-                    `${items.length} articoli totali`
+                    `${filteredItems.length} articoli ${showOnlySelected ? 'selezionati' : 'totali'}`
                   }
                 </small>
+                
+                {/* Toggle button for showing only selected items */}
+                {Object.keys(selectedItems).filter(id => selectedItems[id]).length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      className={`btn btn-sm ${showOnlySelected ? 'btn-primary' : 'btn-outline-primary'}`}
+                      onClick={() => setShowOnlySelected(!showOnlySelected)}
+                    >
+                      {showOnlySelected ? (
+                        <>
+                          <i className="bi bi-eye"></i> Mostra Tutti
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-eye-fill"></i> Mostra Solo Selezionati ({Object.keys(selectedItems).filter(id => selectedItems[id]).length})
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="col-md-6">
                 <div className="row g-2">
@@ -780,7 +826,7 @@ function ItemManagement() {
                   )}
                   
                   <div className="col">
-                    <button
+                  <button
                       className="btn btn-primary w-100"
                       onClick={applySelectionFilter}
                       disabled={
@@ -1262,8 +1308,8 @@ function ItemManagement() {
                   </>
                 ) : (
                   'Aggiungi Articoli'
-                )}
-              </button>
+                    )}
+                  </button>
             </div>
           </div>
         </div>
@@ -1331,6 +1377,172 @@ function ItemManagement() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      
+      {/* Edit Item Modal */}
+      {showEditModal && (
+        <div style={{ 
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          zIndex: 1050,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-in-out'
+        }}>
+          <div className="modal-dialog modal-lg" style={{ 
+            margin: 0, 
+            maxWidth: '90%', 
+            width: '800px', 
+            maxHeight: '90vh',
+            boxShadow: '0 10px 25px rgba(0,0,0,.5)',
+            animation: 'scaleIn 0.2s ease-in-out',
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}>
+            <div className="modal-content" style={{ 
+              maxHeight: '90vh', 
+              overflowY: 'auto', 
+              border: '1px solid #555',
+              borderRadius: '8px',
+              background: '#fff'
+            }}>
+              <div className="modal-header bg-warning text-white" style={{
+                borderTopLeftRadius: '8px',
+                borderTopRightRadius: '8px',
+                borderBottom: '2px solid #e0a800'
+              }}>
+                <h5 className="modal-title" style={{ fontWeight: 'bold' }}>Modifica Articolo</h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  aria-label="Close"
+                  onClick={handleCancel}
+                ></button>
+              </div>
+              <form onSubmit={handleSubmit}>
+                <div className="modal-body">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="mb-3">
+                        <label className="form-label">Nome</label>
+                        <input 
+                          type="text" 
+                          className="form-control" 
+                          name="name" 
+                          value={itemForm.name} 
+                          onChange={handleInputChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="mb-3">
+                        <label className="form-label">Unità (es. kg, pezzi, scatole)</label>
+                        <input 
+                          type="text" 
+                          className="form-control" 
+                          name="unit" 
+                          value={itemForm.unit} 
+                          onChange={handleInputChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="mb-3">
+                        <label className="form-label">Fornitore</label>
+                        <select 
+                          className="form-select" 
+                          name="supplierId" 
+                          value={itemForm.supplierId} 
+                          onChange={handleInputChange}
+                          required
+                        >
+                          <option value="">Seleziona un fornitore...</option>
+                          {suppliers.map(supplier => (
+                            <option key={supplier._id} value={supplier._id}>
+                              {supplier.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="mb-3">
+                        <label className="form-label">Categoria</label>
+                        <select 
+                          className="form-select" 
+                          name="categoryId" 
+                          value={itemForm.categoryId} 
+                          onChange={handleInputChange}
+                        >
+                          <option value="">Seleziona una categoria...</option>
+                          {categories.map(category => (
+                            <option key={category._id} value={category._id}>
+                              {category.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <label className="form-label">Descrizione</label>
+                    <textarea 
+                      className="form-control" 
+                      name="description" 
+                      value={itemForm.description} 
+                      onChange={handleInputChange}
+                      rows="3"
+                    ></textarea>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <label className="form-label">Giorni di disponibilità</label>
+                    <div className="d-flex flex-wrap gap-2">
+                      {daysOfWeek.map(day => (
+                        <div key={day.id} className="form-check">
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            id={`modal-day-${day.id}`}
+                            checked={itemForm.activeDays.includes(day.id)}
+                            onChange={() => handleDayToggle(day.id)}
+                          />
+                          <label className="form-check-label" htmlFor={`modal-day-${day.id}`}>
+                            {day.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer" style={{ 
+                  borderTop: '1px solid #dee2e6',
+                  padding: '1rem',
+                  display: 'flex',
+                  justifyContent: 'space-between'
+                }}>
+                  <button type="button" className="btn btn-secondary" onClick={handleCancel}>
+                    Annulla
+                  </button>
+                  <button type="submit" className="btn btn-warning" style={{ fontWeight: 'bold' }}>
+                    Aggiorna Articolo
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
