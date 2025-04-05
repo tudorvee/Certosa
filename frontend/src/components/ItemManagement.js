@@ -58,6 +58,11 @@ function ItemManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showOnlySelected, setShowOnlySelected] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [tempViewActive, setTempViewActive] = useState(false);
+  const [tempViewCriteria, setTempViewCriteria] = useState({
+    type: '', // 'category', 'supplier', 'noCategory'
+    value: '' // category or supplier ID
+  });
   
   // Add state for active tab
   const [activeTab, setActiveTab] = useState('list');
@@ -302,44 +307,58 @@ function ItemManagement() {
   };
   
   const applySelectionFilter = () => {
-    const newSelectedItems = { ...selectedItems };
-    
-    // Clear previous selection if needed
+    // Instead of immediately selecting items, create a temporary view
     if (selectionFilter === 'all') {
+      // No need for a temp view - just select all items
+      const newSelectedItems = {};
       items.forEach(item => {
         newSelectedItems[item._id] = true;
       });
+      setSelectedItems(newSelectedItems);
+      const allSelected = items.every(item => newSelectedItems[item._id]);
+      setSelectAll(allSelected);
+      // Clear any existing temp view
+      setTempViewActive(false);
+      setTempViewCriteria({ type: '', value: '' });
     }
     else if (selectionFilter === 'category' && selectedCategory) {
-      // Select by category
-      items.forEach(item => {
-        if (item.categoryId && item.categoryId._id === selectedCategory) {
-          newSelectedItems[item._id] = true;
-        }
+      // Create a temporary view for this category
+      setTempViewActive(true);
+      setTempViewCriteria({ 
+        type: 'category', 
+        value: selectedCategory 
       });
+      // Reset any previous selection
+      setSelectedItems({});
+      setSelectAll(false);
     }
     else if (selectionFilter === 'noCategory') {
-      // Select items without category
-      items.forEach(item => {
-        if (!item.categoryId) {
-          newSelectedItems[item._id] = true;
-        }
+      // Create a temporary view for items without a category
+      setTempViewActive(true);
+      setTempViewCriteria({ 
+        type: 'noCategory', 
+        value: '' 
       });
+      // Reset any previous selection
+      setSelectedItems({});
+      setSelectAll(false);
     }
     else if (selectionFilter === 'supplier' && selectedSupplier) {
-      // Select by supplier
-      items.forEach(item => {
-        if (item.supplierId && item.supplierId._id === selectedSupplier) {
-          newSelectedItems[item._id] = true;
-        }
+      // Create a temporary view for this supplier
+      setTempViewActive(true);
+      setTempViewCriteria({ 
+        type: 'supplier', 
+        value: selectedSupplier 
       });
+      // Reset any previous selection
+      setSelectedItems({});
+      setSelectAll(false);
     }
-    
-    setSelectedItems(newSelectedItems);
-    
-    // Check if all items are selected
-    const allSelected = items.every(item => newSelectedItems[item._id]);
-    setSelectAll(allSelected);
+  };
+  
+  const clearTempView = () => {
+    setTempViewActive(false);
+    setTempViewCriteria({ type: '', value: '' });
   };
   
   const handleFilterChange = (e) => {
@@ -622,11 +641,28 @@ function ItemManagement() {
     setSearchTerm(e.target.value);
   };
 
-  // Filter items based on search term
+  // Filter items based on search term and filters
   const filteredItems = items.filter(item => {
     // First check if we're showing only selected items
     if (showOnlySelected && !selectedItems[item._id]) {
       return false;
+    }
+    
+    // Then check if we have an active temporary view
+    if (tempViewActive) {
+      if (tempViewCriteria.type === 'category') {
+        if (!item.categoryId || item.categoryId._id !== tempViewCriteria.value) {
+          return false;
+        }
+      } else if (tempViewCriteria.type === 'noCategory') {
+        if (item.categoryId) {
+          return false;
+        }
+      } else if (tempViewCriteria.type === 'supplier') {
+        if (!item.supplierId || item.supplierId._id !== tempViewCriteria.value) {
+          return false;
+        }
+      }
     }
     
     // Then apply text search filter
@@ -666,7 +702,11 @@ function ItemManagement() {
         <li className="nav-item">
           <button 
             className={`nav-link ${activeTab === 'list' ? 'active' : ''}`} 
-            onClick={() => setActiveTab('list')}
+            onClick={() => {
+              setActiveTab('list');
+              // We don't clear the temporary view when going to the list tab
+              // as that's where the temporary view is shown
+            }}
           >
             <i className="bi bi-list-ul me-2"></i>
             Lista Articoli
@@ -680,6 +720,8 @@ function ItemManagement() {
               if (editMode) {
                 handleCancel();
               }
+              // Clear temporary view when switching tabs
+              clearTempView();
             }}
           >
             <i className="bi bi-plus-circle me-2"></i>
@@ -689,7 +731,11 @@ function ItemManagement() {
         <li className="nav-item">
           <button 
             className={`nav-link ${activeTab === 'bulk' ? 'active' : ''}`} 
-            onClick={() => setActiveTab('bulk')}
+            onClick={() => {
+              setActiveTab('bulk');
+              // Clear temporary view when switching tabs
+              clearTempView();
+            }}
           >
             <i className="bi bi-collection-plus me-2"></i>
             Aggiungi in Blocco
@@ -698,7 +744,11 @@ function ItemManagement() {
         <li className="nav-item">
           <button 
             className={`nav-link ${activeTab === 'inactive' ? 'active' : ''}`} 
-            onClick={() => setActiveTab('inactive')}
+            onClick={() => {
+              setActiveTab('inactive');
+              // Clear temporary view when switching tabs
+              clearTempView();
+            }}
           >
             <i className="bi bi-archive me-2"></i>
             Articoli Disattivati
@@ -783,7 +833,7 @@ function ItemManagement() {
                       value={selectionFilter}
                       onChange={handleFilterChange}
                     >
-                      <option value="">Seleziona filtro...</option>
+                      <option value="">Crea Vista Temporanea...</option>
                       <option value="all">Seleziona Tutti</option>
                       <option value="category">Per Categoria</option>
                       <option value="noCategory">Senza Categoria</option>
@@ -835,12 +885,55 @@ function ItemManagement() {
                         (selectionFilter === 'supplier' && !selectedSupplier)
                       }
                     >
-                      Applica
+                      {selectionFilter === 'all' ? 'Seleziona Tutti' : 'Crea Vista'}
                     </button>
                   </div>
                 </div>
               </div>
             </div>
+            
+            {/* Temporary View Banner */}
+            {tempViewActive && (
+              <div className="alert alert-info mb-3">
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>Vista Temporanea: </strong> 
+                    {tempViewCriteria.type === 'category' && (
+                      <>Articoli nella categoria <span className="badge bg-secondary">{categories.find(c => c._id === tempViewCriteria.value)?.name}</span></>
+                    )}
+                    {tempViewCriteria.type === 'noCategory' && (
+                      <>Articoli senza categoria</>
+                    )}
+                    {tempViewCriteria.type === 'supplier' && (
+                      <>Articoli del fornitore <span className="badge bg-secondary">{suppliers.find(s => s._id === tempViewCriteria.value)?.name}</span></>
+                    )}
+                    <span className="ms-2">({filteredItems.length} articoli)</span>
+                  </div>
+                  <div>
+                    <button 
+                      className="btn btn-outline-secondary btn-sm me-2"
+                      onClick={clearTempView}
+                    >
+                      <i className="bi bi-x"></i> Chiudi Vista
+                    </button>
+                    <button 
+                      className="btn btn-primary btn-sm"
+                      onClick={() => {
+                        // Select all items in the temporary view
+                        const newSelectedItems = {};
+                        filteredItems.forEach(item => {
+                          newSelectedItems[item._id] = true;
+                        });
+                        setSelectedItems(newSelectedItems);
+                        // Keep the view active
+                      }}
+                    >
+                      <i className="bi bi-check-all"></i> Seleziona Tutti
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Bulk Actions Panel - only show when items are selected */}
             {getSelectedItemIds().length > 0 && (
