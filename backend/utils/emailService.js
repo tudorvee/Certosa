@@ -46,10 +46,25 @@ const sendEmail = async (supplierEmail, items, restaurantId, note) => {
     // Create direct transporter
     const transporter = await createDirectTransporter();
     
+    // Check if this is a note-only email
+    const isNoteOnly = (!items || items.length === 0) && note && note.trim().length > 0;
+    
     // Build a simple HTML with the note visible
     let itemsHtml = '';
-    for (const item of items) {
-      itemsHtml += `<tr><td>${item.name}</td><td>${item.quantity} ${item.unit}</td></tr>`;
+    if (items && items.length > 0) {
+      for (const item of items) {
+        // Use customUnit if available, otherwise fall back to original unit
+        const displayUnit = item.customUnit || item.unit;
+        
+        // Simple clean formatting with just quantity and unit in bold
+        itemsHtml += `<tr>
+          <td>${item.name}</td>
+          <td><strong>${item.quantity} ${displayUnit}</strong></td>
+        </tr>`;
+      }
+    } else if (isNoteOnly) {
+      // For note-only emails, we'll show a placeholder
+      itemsHtml = `<tr><td colspan="2" style="text-align:center; font-style:italic;">Nessun articolo - solo nota</td></tr>`;
     }
     
     // Make the note extremely visible
@@ -59,21 +74,28 @@ const sendEmail = async (supplierEmail, items, restaurantId, note) => {
       <p style="font-size:16px; font-weight:bold;">${note}</p>
     </div>` : '';
     
-    // Simplified email template
-    const emailHtml = `
-    <html>
-    <body>
-      <h2>Ordine da ${restaurant.name}</h2>
-      
-      ${noteHtml}
-      
+    // Create the table section only if we have items or it's not a note-only email
+    let tableSection = '';
+    if (!isNoteOnly || items.length > 0) {
+      tableSection = `
       <table border="1" cellpadding="5" style="border-collapse:collapse; width:100%;">
         <tr style="background:#f0f0f0;">
           <th>Articolo</th>
           <th>Quantità</th>
         </tr>
         ${itemsHtml}
-      </table>
+      </table>`;
+    }
+    
+    // Simplified email template
+    const emailHtml = `
+    <html>
+    <body>
+      <h2>${isNoteOnly ? 'SOLO NOTA' : 'Ordine'} da ${restaurant.name}</h2>
+      
+      ${noteHtml}
+      
+      ${tableSection}
       
       <p>Grazie,<br>${restaurant.name}</p>
     </body>
@@ -81,9 +103,14 @@ const sendEmail = async (supplierEmail, items, restaurantId, note) => {
     `;
     
     // Add the note to the subject line
-    const subject = note 
-      ? `🟡 ORDINE CON NOTA: ${note.substring(0, 20)}...` 
-      : `Nuovo Ordine`;
+    let subject;
+    if (isNoteOnly) {
+      subject = `⚠️ SOLO NOTA: ${note.substring(0, 30)}${note.length > 30 ? '...' : ''}`;
+    } else if (note) {
+      subject = `🟡 ORDINE CON NOTA: ${note.substring(0, 20)}${note.length > 20 ? '...' : ''}`;
+    } else {
+      subject = `Nuovo Ordine`;
+    }
       
     console.log('🔴 SENDING HTML EMAIL:', emailHtml);
     

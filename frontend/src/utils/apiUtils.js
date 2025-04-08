@@ -65,32 +65,38 @@ export const apiCall = async (endpoint, method = 'get', data = null) => {
   try {
     let response;
     
+    // Set a timeout for API requests
+    const requestConfig = {
+      ...config,
+      timeout: 10000 // 10 seconds timeout
+    };
+    
     switch (method.toLowerCase()) {
       case 'get':
-        response = await axios.get(`${API_BASE_URL}${fixedEndpoint}`, config);
+        response = await axios.get(`${API_BASE_URL}${fixedEndpoint}`, requestConfig);
         break;
       case 'post':
-        response = await axios.post(`${API_BASE_URL}${fixedEndpoint}`, data, config);
+        response = await axios.post(`${API_BASE_URL}${fixedEndpoint}`, data, requestConfig);
         break;
       case 'put':
-        response = await axios.put(`${API_BASE_URL}${fixedEndpoint}`, data, config);
+        response = await axios.put(`${API_BASE_URL}${fixedEndpoint}`, data, requestConfig);
         break;
       case 'delete':
         // Simplified DELETE request - don't send body data for delete requests
-        if (user?.role === 'superadmin' && config.headers['X-Restaurant-ID']) {
+        if (user?.role === 'superadmin' && requestConfig.headers['X-Restaurant-ID']) {
           // For superadmin, we'll use query params instead of body for DELETE
-          config.params = { 
-            ...(config.params || {}), 
-            restaurantId: config.headers['X-Restaurant-ID'] 
+          requestConfig.params = { 
+            ...(requestConfig.params || {}), 
+            restaurantId: requestConfig.headers['X-Restaurant-ID'] 
           };
         }
-        response = await axios.delete(`${API_BASE_URL}${fixedEndpoint}`, config);
+        response = await axios.delete(`${API_BASE_URL}${fixedEndpoint}`, requestConfig);
         break;
       case 'patch':
-        response = await axios.patch(`${API_BASE_URL}${fixedEndpoint}`, data, config);
+        response = await axios.patch(`${API_BASE_URL}${fixedEndpoint}`, data, requestConfig);
         break;
       default:
-        response = await axios.get(`${API_BASE_URL}${fixedEndpoint}`, config);
+        response = await axios.get(`${API_BASE_URL}${fixedEndpoint}`, requestConfig);
     }
     
     // Log response summary
@@ -108,6 +114,11 @@ export const apiCall = async (endpoint, method = 'get', data = null) => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
+    }
+    
+    // Network errors (API server not responding)
+    if (error.code === 'ECONNABORTED' || !error.response) {
+      throw new Error('Il server non risponde. Riprova più tardi.');
     }
     
     throw error;

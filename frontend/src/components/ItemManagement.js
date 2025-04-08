@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import { apiCall } from '../utils/apiUtils';
 import { AuthContext } from '../context/AuthContext';
 import Papa from 'papaparse';
+import UnitManagement from './UnitManagement';
 
 // Animation styles
 const modalAnimationStyles = `
@@ -755,6 +756,19 @@ function ItemManagement() {
             {inactiveItems.length > 0 && (
               <span className="badge bg-danger ms-2">{inactiveItems.length}</span>
             )}
+          </button>
+        </li>
+        <li className="nav-item">
+          <button 
+            className={`nav-link ${activeTab === 'units' ? 'active' : ''}`} 
+            onClick={() => {
+              setActiveTab('units');
+              // Clear temporary view when switching tabs
+              clearTempView();
+            }}
+          >
+            <i className="bi bi-rulers me-2"></i>
+            Unità di Misura
           </button>
         </li>
       </ul>
@@ -1638,6 +1652,11 @@ function ItemManagement() {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Units Tab */}
+      {activeTab === 'units' && (
+        <UnitManagement />
       )}
     </div>
   );

@@ -4,6 +4,7 @@ require('./models/Item');
 require('./models/Supplier');
 require('./models/Order');
 require('./models/Category');
+require('./models/UnitOfMeasure');
 require('dotenv').config({
   path: process.env.NODE_ENV === 'development' ? '.env.development' : '.env'
 });
@@ -19,7 +20,7 @@ const PORT = process.env.PORT || 5001;
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? 'https://certosa-frontend.onrender.com' 
-    : 'http://localhost:3000',
+    : ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }));
 app.use(express.json({
@@ -51,6 +52,7 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/restaurants', require('./routes/restaurantRoutes'));
 app.use('/api/stats', require('./routes/statsRoutes'));
 app.use('/api/categories', require('./routes/categoryRoutes'));
+app.use('/api/units', require('./routes/unitRoutes'));
 
 // EMERGENCY DIRECT ROUTE - FOR TESTING ONLY
 app.post('/emergency-email-test', async (req, res) => {

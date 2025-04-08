@@ -127,7 +127,7 @@ function OrderHistory() {
         supplierData.items.forEach((item, index) => {
           const itemName = item.itemId?.name || 'Articolo non disponibile';
           const supplierName = supplierData.name || 'Fornitore non disponibile';
-          const quantity = `${item.quantity} ${item.itemId?.unit || ''}`;
+          const quantity = `${item.quantity} ${item.customUnit || item.itemId?.unit || ''}`;
           const note = index === 0 ? supplierData.note : ''; // Include note only on first item for this supplier
           
           // Format: Date,Time,Status,Item,Supplier,Quantity,Note
@@ -141,7 +141,9 @@ function OrderHistory() {
       itemsWithoutSupplier.forEach(item => {
         const itemName = item.itemId?.name || 'Articolo non disponibile';
         const supplierName = 'Fornitore non disponibile';
-        const quantity = `${item.quantity} ${item.itemId?.unit || ''}`;
+        // Use customUnit if available, otherwise fall back to the default unit
+        const unit = item.customUnit || item.itemId?.unit || '';
+        const quantity = `${item.quantity} ${unit}`;
         
         const csvLine = `"${dateStr}","${timeStr}","${status}","${itemName}","${supplierName}","${quantity}",""\n`;
         csvContent += csvLine;
@@ -317,7 +319,14 @@ function OrderHistory() {
                         <tr key={idx}>
                           <td>{item.itemId?.name || 'Articolo non disponibile'}</td>
                           <td>{item.itemId?.supplierId?.name || 'Fornitore non disponibile'}</td>
-                          <td>{item.quantity} {item.itemId?.unit || ''}</td>
+                          <td>
+                            {item.quantity} {item.customUnit || item.itemId?.unit || ''}
+                            {item.customUnit && item.customUnit !== item.itemId?.unit && (
+                              <small className="text-muted ms-1">
+                                (Unità personalizzata)
+                              </small>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

@@ -11,6 +11,11 @@ const OrderSchema = new mongoose.Schema({
       quantity: {
         type: Number,
         required: true
+      },
+      customUnit: {
+        type: String,
+        default: null,
+        description: "Custom unit of measure selected for this item, overrides the default unit"
       }
     }
   ],
@@ -32,7 +37,12 @@ const OrderSchema = new mongoose.Schema({
     of: String,
     default: new Map(),
     description: "Notes for each supplier, keyed by supplier ID"
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   }
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model('Order', OrderSchema); 

@@ -29,12 +29,27 @@ function OrderForm() {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const searchInputRef = useRef(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [units, setUnits] = useState([]);
+  const [customUnits, setCustomUnits] = useState({});
+  const [showUnitSelector, setShowUnitSelector] = useState(null);
 
   // Add clearCart function
   const clearCart = () => {
+    if (!window.confirm('Sei sicuro di voler svuotare il carrello?')) {
+      return;
+    }
     setSelectedItems({});
     setSupplierNotes({});
+    setExpandedSuppliers(new Set());
+    setCustomUnits({});
+    
+    // Remove from localStorage
     localStorage.removeItem('cartState');
+    
+    // Close cart on mobile
+    if (window.innerWidth <= 768) {
+      setIsCartVisible(false);
+    }
   };
 
   // Load saved cart state on component mount
@@ -46,7 +61,7 @@ function OrderForm() {
       setSupplierNotes(savedNotes);
     }
   }, []);
-
+  
   // Save cart state whenever it changes
   useEffect(() => {
     if (Object.keys(selectedItems).length > 0 || Object.keys(supplierNotes).length > 0) {
@@ -58,7 +73,61 @@ function OrderForm() {
   }, [selectedItems, supplierNotes]);
 
   useEffect(() => {
-    fetchData();
+    async function loadData() {
+      setLoading(true);
+      try {
+        await Promise.all([fetchData(), fetchUnits()]);
+        
+        // Load cart state from localStorage
+        try {
+          const savedCartState = localStorage.getItem('cartState');
+          if (savedCartState) {
+            const parsedCart = JSON.parse(savedCartState);
+            setSelectedItems(parsedCart.selectedItems || {});
+            setSupplierNotes(parsedCart.supplierNotes || {});
+            if (parsedCart.expandedSuppliers) {
+              setExpandedSuppliers(new Set(parsedCart.expandedSuppliers));
+            }
+            if (parsedCart.customUnits) {
+              setCustomUnits(parsedCart.customUnits);
+            }
+            
+            // If there are items in the cart, show the cart on desktop
+            if (Object.keys(parsedCart.selectedItems || {}).length > 0 && window.innerWidth > 768) {
+              setIsCartVisible(true);
+              setIsCartOpen(true);
+              setLeftPanelWidth(70);
+              // Add cart expanded class to body
+              document.body.classList.add('cart-expanded');
+              document.body.classList.remove('cart-collapsed');
+            } else {
+              // No items, ensure cart is hidden and body class is set
+              setIsCartVisible(false);
+              setIsCartOpen(false);
+              document.body.classList.remove('cart-expanded');
+              document.body.classList.add('cart-collapsed');
+            }
+            
+            console.log('Cart loaded from localStorage');
+          } else {
+            // No saved cart, ensure cart is hidden and body class is set
+            setIsCartVisible(false);
+            setIsCartOpen(false);
+            document.body.classList.remove('cart-expanded');
+            document.body.classList.add('cart-collapsed');
+          }
+        } catch (error) {
+          console.error('Error loading cart from localStorage:', error);
+        }
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        setMessage('Si è verificato un errore nel caricamento dei dati. Riprova.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadData();
   }, []);
   
   const handleMouseDown = (e) => {
@@ -71,7 +140,7 @@ function OrderForm() {
 
   const handleMouseMove = useCallback((e) => {
     if (!isDragging) return;
-
+    
     const delta = e.clientX - initialX.current;
     const containerWidth = containerRef.current.getBoundingClientRect().width;
     const newWidth = initialLeftWidth.current + delta;
@@ -89,7 +158,7 @@ function OrderForm() {
     setIsDragging(false);
     document.body.classList.remove('resizing');
   }, []);
-
+    
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -106,7 +175,7 @@ function OrderForm() {
     const today = new Date().getDay(); // 0 is Sunday, 1 is Monday, etc.
     return days[today];
   };
-
+  
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -115,7 +184,7 @@ function OrderForm() {
         apiCall('/api/suppliers'),
         apiCall('/api/categories')
       ]);
-
+      
       const currentDay = getCurrentDayOfWeek();
       
       // Filter items that are active on the current day
@@ -141,149 +210,290 @@ function OrderForm() {
         }
       });
       setItemsBySupplier(groupedItems);
-
+      return true;
     } catch (err) {
       console.error('Error fetching data:', err);
       setMessage('Errore nel caricamento dei dati');
+      return false;
     } finally {
-      setLoading(false);
+      // We don't set loading=false here since the parent loadData function will handle this
+      // This prevents race conditions with multiple async calls
     }
   };
   
   const handleItemSelect = (itemId) => {
-    const wasEmpty = Object.keys(selectedItems).length === 0;
-    
-    setSelectedItems(prev => {
-      const updatedItems = { ...prev };
-      if (updatedItems[itemId]) {
-        // If already selected, increase quantity
-        updatedItems[itemId] = {
-          ...updatedItems[itemId],
-          quantity: updatedItems[itemId].quantity + 1
-        };
-      } else {
-        // If not selected, add with quantity 1
-        updatedItems[itemId] = {
-          id: itemId,
-          quantity: 1
-        };
+    // Check if this is a NOTA item
+    if (itemId.startsWith('nota_')) {
+      const supplierId = itemId.replace('nota_', '');
+      
+      // Find the supplier in the suppliers array
+      const supplier = suppliers.find(s => s._id === supplierId);
+      if (supplier) {
+        // Add it to the cart - the NOTA item is a virtual item just to show in the cart
+        setSelectedItems(prev => {
+          // Only add if it doesn't exist already
+          if (!prev[itemId]) {
+            const newSelectedItems = {
+              ...prev,
+              [itemId]: {
+                _id: itemId,
+                name: `Nota per ${supplier.name}`,
+                quantity: 1,
+                supplierId: supplier
+              }
+            };
+            
+            // Save to localStorage
+            setTimeout(() => saveCartToLocalStorage(), 0);
+            
+            return newSelectedItems;
+          }
+          return prev;
+        });
+        
+        // Expand the supplier notes section
+        setExpandedSuppliers(prev => {
+          const newExpanded = new Set(prev);
+          newExpanded.add(supplierId);
+          return newExpanded;
+        });
+        
+        // Make sure the cart is visible so they can see the notes field
+        if (!isCartVisible) {
+          toggleCart(); // Use toggleCart instead of directly setting isCartVisible
+        }
+        
+        // Focus on the textarea after a moment
+        setTimeout(() => {
+          const textarea = document.querySelector(`textarea[data-supplier-id="${supplierId}"]`);
+          if (textarea) {
+            textarea.focus();
+          }
+        }, 100);
+        
+        return;
       }
-      return updatedItems;
-    });
-    
-    // If this was the first item added to cart and cart is hidden, show the cart
-    if (wasEmpty && !isCartVisible && window.innerWidth > 768) {
-      toggleCart();
     }
     
-    // Keep search expanded and don't clear search term when selecting an item
-    // This ensures that the search results stay visible
+    // Get the item from the items array
+    const item = items.find(i => i._id === itemId);
+    if (!item) return;
+    
+    // Toggle item selection
+    setSelectedItems(prev => {
+      const wasEmpty = Object.keys(prev).length === 0;
+      
+      if (prev[itemId]) {
+        // Item is already selected, update quantity
+        const updatedItems = {
+          ...prev,
+          [itemId]: {
+            ...prev[itemId],
+            quantity: prev[itemId].quantity + 1
+          }
+        };
+        
+        // Save to localStorage
+        setTimeout(() => saveCartToLocalStorage(), 0);
+        
+        return updatedItems;
+      } else {
+        // Item is not selected, add it
+        const updatedItems = {
+          ...prev,
+          [itemId]: {
+            _id: itemId,
+            name: item.name,
+            quantity: 1,
+            unit: item.unit,
+            supplierId: item.supplierId
+          }
+        };
+        
+        // Save to localStorage
+        setTimeout(() => saveCartToLocalStorage(), 0);
+        
+        // If this is the first item, make sure cart is visible
+        if (wasEmpty) {
+          toggleCart(); // Use toggleCart instead of directly setting isCartVisible
+        }
+        
+        return updatedItems;
+      }
+    });
   };
   
   const handleIncreaseQuantity = (itemId) => {
     setSelectedItems(prev => {
-      const updatedItems = { ...prev };
-      if (updatedItems[itemId]) {
-        updatedItems[itemId] = {
-          ...updatedItems[itemId],
-          quantity: updatedItems[itemId].quantity + 1
+      if (prev[itemId]) {
+        const updatedItems = {
+          ...prev,
+          [itemId]: {
+            ...prev[itemId],
+            quantity: prev[itemId].quantity + 1
+          }
         };
+        // Save to localStorage
+        setTimeout(() => saveCartToLocalStorage(), 0);
+        return updatedItems;
       }
-      return updatedItems;
+      return prev;
     });
   };
   
   const handleDecreaseQuantity = (itemId) => {
     setSelectedItems(prev => {
-      const updatedItems = { ...prev };
-      if (updatedItems[itemId] && updatedItems[itemId].quantity > 1) {
-        updatedItems[itemId] = {
-          ...updatedItems[itemId],
-          quantity: updatedItems[itemId].quantity - 1
+      if (prev[itemId] && prev[itemId].quantity > 1) {
+        const updatedItems = {
+          ...prev,
+          [itemId]: {
+            ...prev[itemId],
+            quantity: prev[itemId].quantity - 1
+          }
         };
-      } else if (updatedItems[itemId] && updatedItems[itemId].quantity === 1) {
-        // Remove item if quantity becomes 0
-        delete updatedItems[itemId];
+        // Save to localStorage
+        setTimeout(() => saveCartToLocalStorage(), 0);
+        return updatedItems;
+      } else if (prev[itemId] && prev[itemId].quantity <= 1) {
+        // If quantity is 1 or less, remove the item
+        handleRemoveItem(itemId);
       }
-      return updatedItems;
+      return prev;
     });
   };
   
   const handleRemoveItem = (itemId) => {
     setSelectedItems(prev => {
-      const updatedItems = { ...prev };
-      delete updatedItems[itemId];
-      return updatedItems;
+      const newSelectedItems = { ...prev };
+      delete newSelectedItems[itemId];
+      
+      // Save to localStorage after state update
+      setTimeout(() => saveCartToLocalStorage(), 0);
+      
+      return newSelectedItems;
     });
   };
   
-  // Handle note change for a supplier
-  const handleNoteChange = (supplierId, note) => {
-    console.log('Setting note for supplier:', supplierId, note);
-    setSupplierNotes(prev => ({
-      ...prev,
-      [supplierId]: note
-    }));
+  // Modify the handle note change function
+  const handleNoteChange = (supplierId, text) => {
+    setSupplierNotes(prev => {
+      const updatedNotes = {
+        ...prev,
+        [supplierId]: text
+      };
+      
+      // Save to localStorage
+      setTimeout(() => saveCartToLocalStorage(), 0);
+      
+      return updatedNotes;
+    });
   };
   
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage('');
+  // Add a function to handle note-only submissions
+  const hasNoteOnlyOrder = () => {
+    // Check if there are any supplier notes but no items
+    const hasNotes = Object.values(supplierNotes).some(note => note?.trim());
+    const hasItems = Object.keys(selectedItems).length > 0;
     
-    const orderItems = Object.entries(selectedItems)
-      .filter(([_, itemData]) => itemData.quantity > 0)
-      .map(([itemId, itemData]) => ({
-        itemId: itemId,
-        quantity: itemData.quantity
-      }));
-    
-    if (orderItems.length === 0) {
-      setMessage('Seleziona almeno un articolo');
-      return;
-    }
-    
+    return hasNotes && !hasItems;
+  };
+  
+  // Update handleSubmit to allow note-only orders
+  const handleSubmit = async () => {
     try {
-      console.log('Submitting order with items:', orderItems);
+      // Separate regular items from NOTA items
+      const regularItems = Object.entries(selectedItems).filter(([itemId]) => !itemId.startsWith('nota_'));
+      const notaItems = Object.entries(selectedItems).filter(([itemId]) => itemId.startsWith('nota_'));
       
-      // Create a clean object of supplier notes for only suppliers with items in this order
-      const notesForOrder = {};
+      // Check if there are items selected or supplier notes
+      const hasRegularItems = regularItems.length > 0;
+      const hasNotaItems = notaItems.length > 0;
+      const hasNotes = Object.values(supplierNotes).some(note => note?.trim());
       
-      // First find which suppliers are in this order
-      const supplierIds = new Set();
-      for (const orderItem of orderItems) {
-        const item = items.find(i => i._id === orderItem.itemId);
-        if (item && item.supplierId) {
-          supplierIds.add(item.supplierId._id);
+      if (!hasRegularItems && !hasNotaItems && !hasNotes) {
+        setMessage("Seleziona almeno un articolo o aggiungi una nota a un fornitore");
+        return;
+      }
+      
+      // Check if NOTA items have corresponding notes
+      for (const [itemId] of notaItems) {
+        const supplierId = itemId.replace('nota_', '');
+        if (!supplierNotes[supplierId] || !supplierNotes[supplierId].trim()) {
+          setMessage(`Aggiungi una nota per il fornitore o rimuovi l'elemento NOTA`);
+          return;
         }
       }
       
-      // Then only include notes for those suppliers
-      for (const supplierId of supplierIds) {
-        const note = supplierNotes[supplierId];
-        if (note && note.trim()) {
-          notesForOrder[supplierId] = note.trim();
-        }
-      }
-      
-      console.log('Notes being sent with order:', notesForOrder);
-      
-      const response = await apiCall('/api/orders', 'POST', { 
-        items: orderItems,
-        supplierNotes: notesForOrder
+      setLoading(true);
+      setMessage('');
+
+      // Convert selected items to array for API (excluding NOTA items)
+      const itemsArray = [];
+      regularItems.forEach(([itemId, details]) => {
+        // Add custom unit if one was selected for this item
+        const customUnit = customUnits[itemId] || null;
+        
+        itemsArray.push({
+          itemId,
+          name: details.name,
+          quantity: details.quantity,
+          unit: details.unit,
+          customUnit: customUnit,
+          supplierId: details.supplierId
+        });
       });
+
+      // Create a clean object of supplier notes (without empty notes)
+      const cleanNotes = {};
+      Object.entries(supplierNotes).forEach(([supplierId, note]) => {
+        // Only include notes that are not empty
+        if (note && note.trim()) {
+          cleanNotes[supplierId] = note.trim();
+        }
+      });
+
+      // Prepare request body
+      const requestBody = {};
       
-      console.log('Order submitted successfully:', response.data);
-      setMessage('Ordine inviato con successo! Le email sono state inviate ai fornitori.');
+      // Only include items if there are any regular items
+      if (hasRegularItems) {
+        requestBody.items = itemsArray;
+      }
+      
+      // Only include notes if there are any
+      if (hasNotes) {
+        requestBody.supplierNotes = cleanNotes;
+      }
+
+      // Send the order
+      const response = await apiCall('/api/orders', 'POST', requestBody);
+
+      // apiCall returns an axios response, not a fetch response, so we use response.data directly
+      console.log('Order created:', response.data);
+      
+      // Show success message with any email errors
+      if (response.data.emailErrors && response.data.emailErrors.length > 0) {
+        setMessage(`Ordine creato con ${response.data.emailErrors.length} errori di email: ${response.data.emailErrors.join(', ')}`);
+      } else {
+        setMessage("Ordine inviato con successo!");
+      }
+      
+      // Reset form
       setSelectedItems({});
       setSupplierNotes({});
-      // Clear cart from localStorage after successful submission
-      localStorage.removeItem('cartState');
-    } catch (err) {
-      console.error('Error creating order:', err);
+      setExpandedSuppliers(new Set());
+      setSearchTerm('');
+      setFilter('all');
+      setIsCartVisible(false);
+      setCustomUnits({});
       
-      // Check if there's a specific message from the server
-      const errorMessage = err.response?.data?.message || 'Errore durante l\'invio dell\'ordine. Riprova.';
-      setMessage(errorMessage);
+      // Reset local storage
+      localStorage.removeItem('cartState');
+    } catch (error) {
+      console.error('Error submitting order:', error);
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -357,6 +567,26 @@ function OrderForm() {
         filteredItems = filteredItems.filter(item => 
           item && item.supplierId && item.supplierId._id === filter
         );
+        
+        // If filtering by supplier, add a special "NOTA" item at the beginning of the list
+        // This allows adding notes without adding any real items
+        if (filter !== 'all') {
+          const supplier = suppliers.find(s => s._id === filter);
+          if (supplier) {
+            // Create a virtual "NOTA" item
+            const notaItem = {
+              _id: `nota_${supplier._id}`,
+              name: "NOTA",
+              description: "Invia un messaggio al fornitore",
+              unit: "",
+              supplierId: supplier,
+              isNotaItem: true // Flag to identify this as a special item
+            };
+            
+            // Add the NOTA item at the beginning of the list
+            filteredItems = [notaItem, ...filteredItems];
+          }
+        }
       } else if (filterType === 'category') {
         filteredItems = filteredItems.filter(item => 
           item && item.categoryId && item.categoryId._id === filter
@@ -594,16 +824,7 @@ function OrderForm() {
     }
   };
 
-  // Clean up body overflow when component unmounts
-  useEffect(() => {
-    return () => {
-      document.body.style.overflow = '';
-      document.body.classList.remove('cart-expanded');
-      document.body.classList.remove('cart-collapsed');
-    };
-  }, []);
-
-  // Set initial cart class on the body when component mounts
+  // Effect to ensure body classes match cart visibility state
   useEffect(() => {
     if (isCartVisible) {
       document.body.classList.add('cart-expanded');
@@ -613,6 +834,15 @@ function OrderForm() {
       document.body.classList.add('cart-collapsed');
     }
   }, [isCartVisible]);
+
+  // Clean up body overflow when component unmounts
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = '';
+      document.body.classList.remove('cart-expanded');
+      document.body.classList.remove('cart-collapsed');
+    };
+  }, []);
 
   // Add this function to get the number of items in cart
   const getCartItemCount = () => {
@@ -638,32 +868,32 @@ function OrderForm() {
   const renderFilterToggle = () => {
     return (
       <div className="filter-toggle-wrapper">
-        <button 
+                <button 
           className={`filter-toggle ${filterType === 'category' ? 'category' : ''}`}
           onClick={handleFilterTypeChange}
         >
           <div className="toggle-text">
             {filterType === 'supplier' ? 'Fornitore' : 'Categoria'}
-          </div>
+              </div>
           <div className="toggle-slider"></div>
         </button>
         
         <div className={`search-container ${isSearchExpanded ? 'expanded' : 'collapsed'}`}>
           <button className="search-button" onClick={toggleSearch}>
             <i className="bi bi-search"></i>
-          </button>
+                  </button>
           <input
             ref={searchInputRef}
             type="text"
             placeholder="Cerca articoli..."
             value={searchTerm}
             onChange={handleSearchChange}
-            style={{ 
+                      style={{ 
               opacity: isSearchExpanded ? 1 : 0,
               pointerEvents: isSearchExpanded ? 'auto' : 'none'
-            }}
+                      }}
           />
-        </div>
+                </div>
       </div>
     );
   };
@@ -673,23 +903,23 @@ function OrderForm() {
     
     return (
       <div className="filter-scroll-container">
-        <button
+                  <button
           key="all"
           className={`filter-button ${filter === 'all' ? 'active' : ''} ${filterType === 'category' ? 'category' : ''}`}
-          onClick={() => setFilter('all')}
-        >
+                    onClick={() => setFilter('all')}
+                  >
           Tutti
-        </button>
+                  </button>
         {data.map(item => (
-          <button
+                    <button
             key={item._id}
             className={`filter-button ${filter === item._id ? 'active' : ''} ${filterType === 'category' ? 'category' : ''}`}
             onClick={() => setFilter(item._id)}
           >
             {item.name}
-          </button>
-        ))}
-      </div>
+                    </button>
+                  ))}
+                </div>
     );
   };
 
@@ -732,12 +962,94 @@ function OrderForm() {
       <div className="filter-section">
         {renderFilterToggle()}
         {renderFilterButtons()}
-      </div>
+              </div>
     );
   };
 
-  const toggleCartVisibility = () => {
-    setIsCartOpen(!isCartOpen);
+  // Function to fetch units of measure
+  const fetchUnits = async () => {
+    try {
+      const response = await apiCall('/api/units');
+      console.log('Units fetched for OrderForm:', response.data);
+      setUnits(response.data || []);
+      return true;
+    } catch (error) {
+      console.error('Error fetching units of measure:', error);
+      // Add default units if API fails
+      setUnits([
+        { _id: 'default-kg', name: 'Kilogram', abbreviation: 'kg' },
+        { _id: 'default-g', name: 'Gram', abbreviation: 'g' },
+        { _id: 'default-l', name: 'Liter', abbreviation: 'l' },
+        { _id: 'default-pz', name: 'Piece', abbreviation: 'pz' }
+      ]);
+      return false;
+    }
+  };
+  
+  // Function to save cart state to localStorage
+  const saveCartToLocalStorage = () => {
+    try {
+      const cartState = {
+        selectedItems,
+        supplierNotes,
+        expandedSuppliers: Array.from(expandedSuppliers),
+        customUnits
+      };
+      localStorage.setItem('cartState', JSON.stringify(cartState));
+      console.log('Cart saved to localStorage');
+    } catch (error) {
+      console.error('Error saving cart to localStorage:', error);
+    }
+  };
+
+  // Add handler for changing unit of measure
+  const handleUnitChange = (itemId, unit) => {
+    console.log(`Changing unit for item ${itemId} to ${unit}`);
+    
+    // If unit is null or matches the original item's unit, remove the custom unit
+    const originalItem = items.find(i => i._id === itemId);
+    
+    if (!unit || (originalItem && unit === originalItem.unit)) {
+      console.log(`Resetting to original unit: ${originalItem?.unit}`);
+      // Reset to original unit
+      setCustomUnits(prev => {
+        const newUnits = {...prev};
+        delete newUnits[itemId];
+        return newUnits;
+      });
+    } else {
+      // Set custom unit
+      console.log(`Setting custom unit: ${unit}`);
+      setCustomUnits(prev => ({
+        ...prev,
+        [itemId]: unit
+      }));
+    }
+    
+    // Close the dropdown
+    setShowUnitSelector(null);
+    
+    // Update the selectedItems to force re-render
+    setSelectedItems(prev => {
+      const updatedItems = {...prev};
+      if (updatedItems[itemId]) {
+        updatedItems[itemId] = {
+          ...updatedItems[itemId],
+          // Preserve any existing properties
+        };
+      }
+      return updatedItems;
+    });
+    
+    // Save to localStorage
+    saveCartToLocalStorage();
+  };
+  
+  // Function to get the current unit for an item (custom or default)
+  const getItemUnit = (item) => {
+    const itemId = item._id;
+    const customUnit = customUnits[itemId];
+    return customUnit || item.unit;
   };
 
   if (loading) {
@@ -749,7 +1061,15 @@ function OrderForm() {
       {message && (
         <div className={`alert ${message.includes('successo') ? 'alert-success' : 'alert-danger'} m-1 py-2`}>
           {message}
-        </div>
+          </div>
+      )}
+      
+      {/* Overlay when dropdown is open */}
+      {showUnitSelector && (
+        <div 
+          className="dropdown-overlay" 
+          onClick={() => setShowUnitSelector(null)}
+        />
       )}
       
       <div className={`order-content ${isCartOpen ? 'cart-open' : ''}`} ref={containerRef}>
@@ -763,45 +1083,68 @@ function OrderForm() {
         >
           <div className="items-section">
             {renderFilterSection()}
-            <div className="items-grid">
-              {getFilteredItems().length > 0 ? (
-                getFilteredItems().map(item => (
-                  <div 
-                    key={item._id} 
-                    className={`item-card ${selectedItems[item._id] ? 'selected' : ''}`}
-                    onClick={() => handleItemSelect(item._id)}
-                    style={{ backgroundColor: getCategoryColor(item.categoryId?._id) }}
+          <div className="items-grid">
+            {getFilteredItems().length > 0 ? (
+              getFilteredItems().map(item => (
+                <div 
+                  key={item._id} 
+                    className={`item-card ${selectedItems[item._id] ? 'selected' : ''} ${item.isNotaItem ? 'nota-item' : ''}`}
+                  onClick={() => handleItemSelect(item._id)}
+                    style={{ 
+                      backgroundColor: item.isNotaItem ? '#FFF9C4' : getCategoryColor(item.categoryId?._id),
+                      border: item.isNotaItem ? '2px dashed #FFA000' : null,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center'
+                    }}
                   >
-                    <div className="item-card-header">
-                      <h5 className="item-name" title={item.name}>{item.name}</h5>
-                    </div>
-                    
-                    <div className="item-unit-corner">
-                      <small>{item.unit}</small>
-                    </div>
-                    
-                    {selectedItems[item._id] && (
-                      <div className="item-quantity-badge">
-                        {selectedItems[item._id].quantity}
-                      </div>
-                    )}
+                    {item.isNotaItem ? (
+                      <>
+                        <div className="item-card-header text-center">
+                          <h5 className="item-name" style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>{item.name}</h5>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#555', textAlign: 'center', padding: '0 5px' }}>
+                          {item.description}
+                        </div>
+                        <div style={{ marginTop: '5px' }}>
+                          <i className="bi bi-pencil-square" style={{ fontSize: '1.5rem', color: '#FFA000' }}></i>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                  <div className="item-card-header">
+                          <h5 className="item-name" title={item.name}>{item.name}</h5>
+                        </div>
+                        
+                        <div className="item-unit-corner">
+                          <small>{getItemUnit(item)}</small>
                   </div>
-                ))
-              ) : (
-                <div className="no-items-found">
-                  <p className="text-center text-muted my-3">
-                    <i className="bi bi-search me-2"></i>
-                    {searchTerm ? 
-                      `Nessun articolo trovato per "${searchTerm}"` : 
-                      "Nessun articolo disponibile"
-                    }
-                  </p>
+                  
+                  {selectedItems[item._id] && (
+                    <div className="item-quantity-badge">
+                      {selectedItems[item._id].quantity}
+                    </div>
+                        )}
+                      </>
+                  )}
                 </div>
-              )}
+              ))
+            ) : (
+              <div className="no-items-found">
+                <p className="text-center text-muted my-3">
+                  <i className="bi bi-search me-2"></i>
+                  {searchTerm ? 
+                    `Nessun articolo trovato per "${searchTerm}"` : 
+                    "Nessun articolo disponibile"
+                  }
+                </p>
+              </div>
+            )}
             </div>
           </div>
-        </div>
-        
+          </div>
+          
         <div 
           className={`selected-section ${isCartVisible ? 'expanded' : 'collapsed'}`}
           ref={rightPanelRef}
@@ -828,7 +1171,7 @@ function OrderForm() {
                   Svuota Carrello
                 </button>
               )}
-            </div>
+              </div>
             <div className="d-flex align-items-center">
               <div className="me-3">
                 {getTotalItemsCount()} {getTotalItemsCount() === 1 ? 'articolo' : 'articoli'}
@@ -841,103 +1184,199 @@ function OrderForm() {
             </div>
           </div>
 
-          <div className="selected-items-list">
-            {Object.entries(itemsBySupplier).map(([supplierId, supplierData]) => {
-              const supplierItems = supplierData.items.filter(item => 
-                selectedItems[item._id]
+              <div className="selected-items-list">
+                {Object.entries(itemsBySupplier).map(([supplierId, supplierData]) => {
+              // Get regular items for this supplier
+                  const supplierItems = supplierData.items.filter(item => 
+                    selectedItems[item._id]
+                  );
+                  
+              // Check if there's a NOTA item for this supplier
+              const hasNotaItem = Object.keys(selectedItems).some(
+                itemId => itemId.startsWith('nota_') && itemId.includes(supplierId)
               );
               
-              if (supplierItems.length === 0) return null;
+              const hasNote = supplierNotes[supplierId] && supplierNotes[supplierId].trim().length > 0;
+              const isExpanded = expandedSuppliers.has(supplierId);
               
-              return (
-                <div key={supplierId} className="supplier-group mb-3">
-                  <h5 
-                    className="supplier-name mb-1" 
-                    style={{
-                      backgroundColor: getSupplierColor(supplierId),
-                      padding: '6px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontSize: '0.95rem',
-                      flexWrap: 'wrap',
-                      gap: '5px'
-                    }}
-                    onClick={() => toggleSupplierNote(supplierId)}
-                  >
-                    <span style={{ flex: '1', minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {supplierData.supplier.name}
-                    </span>
-                    <small style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                      {expandedSuppliers.has(supplierId) ? 'Nascondi nota' : 'Aggiungi nota'}
-                    </small>
-                  </h5>
-                  {supplierItems.map(item => (
-                    <div key={item._id} className="selected-item-row">
-                      <div className="item-info">
-                        <div style={{ display: "flex", alignItems: "flex-start" }}>
+              // Skip if no regular items AND no NOTA items AND no notes AND not expanded
+              if (supplierItems.length === 0 && !hasNotaItem && !hasNote && !isExpanded) return null;
+                  
+                  return (
+                    <div key={supplierId} className="supplier-group mb-3">
+                      <h5 
+                        className="supplier-name mb-1" 
+                        style={{
+                          backgroundColor: getSupplierColor(supplierId),
+                          padding: '6px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontSize: '0.95rem',
+                          flexWrap: 'wrap',
+                          gap: '5px'
+                        }}
+                        onClick={() => toggleSupplierNote(supplierId)}
+                      >
+                        <span style={{ flex: '1', minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {supplierData.supplier.name}
+                        </span>
+                        <small style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                          {expandedSuppliers.has(supplierId) ? 'Nascondi nota' : 'Aggiungi nota'}
+                        </small>
+                      </h5>
+                      {supplierItems.map(item => (
+                        <div key={item._id} className="selected-item-row">
+                          <div className="item-info">
+                        <div style={{ display: "flex", alignItems: "flex-start", flexWrap: "wrap" }}>
                           <span className="item-name" title={item.name}>{item.name}</span>
-                          <small className="text-muted" style={{ marginLeft: "5px" }}>({item.unit})</small>
                         </div>
                       </div>
                       <div className="quantity-controls">
-                        <button 
-                          className="btn btn-sm btn-outline-secondary" 
+                        <span 
+                          className={`unit-button ${showUnitSelector === item._id ? 'unit-button-active' : ''}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDecreaseQuantity(item._id);
+                            setShowUnitSelector(item._id);
                           }}
+                          title="Clicca per cambiare unità di misura"
                         >
-                          -
+                          {customUnits[item._id] || item.unit}
+                          {showUnitSelector === item._id && (
+                            <div className="unit-dropdown">
+                              <div className="unit-dropdown-header">
+                                <span>Cambia unità</span>
+                                <span 
+                                  className="unit-dropdown-close"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowUnitSelector(null);
+                                  }}
+                                >×</span>
+                              </div>
+                              
+                              {item.unit !== (customUnits[item._id] || item.unit) && (
+                                <div 
+                                  className="unit-dropdown-item unit-dropdown-reset"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnitChange(item._id, null);
+                                  }}
+                                >
+                                  Ripristina unità originale ({item.unit})
+                                </div>
+                              )}
+                              
+                              {units.map(unit => (
+                                <div 
+                                  key={unit._id}
+                                  className={`unit-dropdown-item ${(customUnits[item._id] || item.unit) === unit.abbreviation ? 'active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnitChange(item._id, unit.abbreviation);
+                                  }}
+                                >
+                                  {unit.name} ({unit.abbreviation})
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </span>
+                        <button 
+                          className="btn btn-outline-secondary btn-sm" 
+                          onClick={() => handleDecreaseQuantity(item._id)}
+                        >
+                          <i className="bi bi-dash"></i>
                         </button>
                         <span className="quantity">{selectedItems[item._id].quantity}</span>
                         <button 
-                          className="btn btn-sm btn-outline-secondary" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleIncreaseQuantity(item._id);
-                          }}
+                          className="btn btn-outline-secondary btn-sm" 
+                          onClick={() => handleIncreaseQuantity(item._id)}
                         >
-                          +
+                          <i className="bi bi-plus"></i>
                         </button>
                         <button 
-                          className="btn btn-sm btn-danger" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveItem(item._id);
-                          }}
+                          className="btn btn-outline-danger btn-sm" 
+                          onClick={() => handleRemoveItem(item._id)}
                         >
                           <i className="bi bi-trash"></i>
                         </button>
                       </div>
                     </div>
                   ))}
-                  {expandedSuppliers.has(supplierId) && (
-                    <div className="supplier-note mt-2">
-                      <label className="form-label fw-bold">Note per il fornitore:</label>
-                      <textarea
-                        className="form-control"
-                        placeholder="Note per il fornitore (opzionale)"
-                        value={supplierNotes[supplierId] || ''}
-                        onChange={(e) => handleNoteChange(supplierId, e.target.value)}
-                        rows="2"
-                        style={{
-                          border: supplierNotes[supplierId] ? "2px solid green" : "1px solid #ced4da"
-                        }}
-                      />
-                      {supplierNotes[supplierId] && (
-                        <div className="text-success mt-1">
-                          <small>✓ Nota impostata: {supplierNotes[supplierId].length} caratteri</small>
+                  
+                  {/* Display NOTA items in the cart */}
+                  {Object.entries(selectedItems)
+                    .filter(([itemId]) => itemId.startsWith('nota_') && itemId.includes(supplierId))
+                    .map(([itemId, item]) => (
+                      <div key={itemId} className="selected-item-row nota-item-row">
+                        <div className="item-info">
+                          <div style={{ display: "flex", alignItems: "center" }}>
+                            <span className="item-name" style={{ 
+                              fontWeight: 'bold', 
+                              color: '#FFA000',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}>
+                              <i className="bi bi-pencil-square me-1"></i>
+                              {item.name}
+                            </span>
+                            <small 
+                              className="text-muted ms-2"
+                              style={{ fontStyle: 'italic' }}
+                            >
+                              (Messaggio al fornitore)
+                            </small>
+                          </div>
+                        </div>
+                        <div className="quantity-controls">
+                          <button 
+                            className="btn btn-sm btn-danger" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveItem(itemId);
+                              // Also collapse the notes section when removing the NOTA item
+                              setExpandedSuppliers(prev => {
+                                const newExpanded = new Set(prev);
+                                newExpanded.delete(supplierId);
+                                return newExpanded;
+                              });
+                            }}
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  }
+                  
+                      {expandedSuppliers.has(supplierId) && (
+                        <div className="supplier-note mt-2">
+                          <label className="form-label fw-bold">Note per il fornitore:</label>
+                          <textarea
+                            className="form-control"
+                            placeholder="Note per il fornitore (opzionale)"
+                            value={supplierNotes[supplierId] || ''}
+                            onChange={(e) => handleNoteChange(supplierId, e.target.value)}
+                            rows="2"
+                        data-supplier-id={supplierId}
+                            style={{
+                              border: supplierNotes[supplierId] ? "2px solid green" : "1px solid #ced4da"
+                            }}
+                          />
+                          {supplierNotes[supplierId] && (
+                            <div className="text-success mt-1">
+                              <small>✓ Nota impostata: {supplierNotes[supplierId].length} caratteri</small>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
 
           <div className="order-button-container">
             <button
@@ -947,9 +1386,9 @@ function OrderForm() {
               <i className="bi bi-send" />
               <span>Invia Ordine</span>
             </button>
-          </div>
-        </div>
-      </div>
+            </div>
+              </div>
+            </div>
 
       {/* Mobile cart button - only visible on mobile */}
       <div className="mobile-cart-button" onClick={toggleCart}>
@@ -961,7 +1400,7 @@ function OrderForm() {
       
       {/* Desktop fixed cart button - visible when cart is collapsed */}
       <div 
-        className={`desktop-fixed-cart-button ${!isCartVisible ? 'visible' : ''}`} 
+        className={`desktop-fixed-cart-button ${!isCartVisible ? 'visible' : ''}`}
         onClick={toggleCart}
         title="Mostra Carrello"
       >
@@ -974,4 +1413,4 @@ function OrderForm() {
   );
 }
 
-export default OrderForm; 
+export default OrderForm;

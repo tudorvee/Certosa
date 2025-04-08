@@ -215,70 +215,83 @@ router.post('/test-email', isKitchen, async (req, res) => {
 // Create a new order with better error handling
 router.post('/', isKitchen, async (req, res) => {
   try {
-    // Validate input
-    if (!req.body.items || !Array.isArray(req.body.items) || req.body.items.length === 0) {
-      return res.status(400).json({ message: 'Nessun articolo fornito per l\'ordine' });
+    console.log("Order request received:", req.body);
+    console.log("Supplier notes received:", req.body.supplierNotes);
+    
+    const { items = [], supplierNotes = {} } = req.body;
+    
+    // Validate that we have either items or supplier notes
+    const hasItems = Array.isArray(items) && items.length > 0;
+    const hasNotes = Object.values(supplierNotes).some(note => note && note.trim());
+    
+    if (!hasItems && !hasNotes) {
+      return res.status(400).json({ message: 'L\'ordine deve contenere almeno un articolo o una nota' });
     }
     
-    // Get restaurant info
-    console.log('Creating order for restaurant:', req.restaurantId);
-    console.log('Full request body:', req.body); // Log the entire request body
-    console.log('Supplier notes from request:', req.body.supplierNotes); // Log just the notes
-    
-    const restaurant = await Restaurant.findById(req.restaurantId);
-    if (!restaurant) {
-      return res.status(400).json({ message: 'Ristorante non trovato' });
-    }
-    
-    // Create the order with restaurant ID
     const order = new Order({
-      items: req.body.items,
-      restaurantId: req.restaurantId,
-      supplierNotes: req.body.supplierNotes || {}
+      restaurantId: req.user.restaurantId,
+      items: items.map(item => ({
+        itemId: item.itemId,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        customUnit: item.customUnit || null, // Handle custom unit if provided
+        supplierId: item.supplierId
+      })),
+      supplierNotes,
+      createdBy: req.user._id
     });
     
-    // Save the order first
     const savedOrder = await order.save();
-    console.log('Order saved to database:', savedOrder._id);
-    console.log('Saved order details:', {
-      items: savedOrder.items,
-      supplierNotes: savedOrder.supplierNotes
-    });
+    console.log("Order saved:", savedOrder);
     
-    // Group items by supplier
+    // Initialize an object to group items by supplier for emails
     const supplierItems = {};
     const emailErrors = [];
     
-    // Collect item details and group by supplier
-    for (const orderItem of req.body.items) {
-      try {
-        const item = await Item.findById(orderItem.itemId).populate('supplierId');
-        if (!item) {
-          console.error(`Item not found: ${orderItem.itemId}`);
-          continue;
+    // Only process items if they exist
+    if (hasItems) {
+      console.log("Processing order items with units:");
+      items.forEach(item => {
+        console.log(`- Item: ${item.name}, Quantity: ${item.quantity}, Original Unit: ${item.unit}, Custom Unit: ${item.customUnit || 'N/A'}`);
+      });
+      
+      // Group items by supplier
+      for (const item of items) {
+        try {
+          // Get the full item details from the database
+          const dbItem = await Item.findById(item.itemId).populate('supplierId');
+          
+          if (!dbItem) {
+            console.error(`Item not found: ${item.itemId}`);
+            continue;
+          }
+          
+          if (!dbItem.supplierId) {
+            console.error(`Item ${dbItem.name} has no supplier`);
+            continue;
+          }
+          
+          const supplierId = dbItem.supplierId._id.toString();
+          
+          // Initialize the supplier group if not exists
+          if (!supplierItems[supplierId]) {
+            supplierItems[supplierId] = {
+              supplier: dbItem.supplierId,
+              items: []
+            };
+          }
+          
+          // Add the item to its supplier's group
+          supplierItems[supplierId].items.push({
+            name: dbItem.name,
+            quantity: item.quantity,
+            unit: dbItem.unit,
+            customUnit: item.customUnit
+          });
+        } catch (err) {
+          console.error(`Error processing item ${item.itemId}:`, err);
         }
-        
-        if (!item.supplierId) {
-          console.error(`Supplier not found for item: ${item.name}`);
-          continue;
-        }
-        
-        const supplierId = item.supplierId._id.toString();
-        
-        if (!supplierItems[supplierId]) {
-          supplierItems[supplierId] = {
-            supplier: item.supplierId,
-            items: []
-          };
-        }
-        
-        supplierItems[supplierId].items.push({
-          name: item.name,
-          quantity: orderItem.quantity,
-          unit: item.unit
-        });
-      } catch (err) {
-        console.error(`Error processing order item ${orderItem.itemId}:`, err);
       }
     }
     
@@ -298,8 +311,8 @@ router.post('/', isKitchen, async (req, res) => {
         
         // Get the note for this supplier
         let supplierNote = null;
-        if (req.body.supplierNotes && typeof req.body.supplierNotes === 'object') {
-          supplierNote = req.body.supplierNotes[supplierId];
+        if (supplierNotes && typeof supplierNotes === 'object') {
+          supplierNote = supplierNotes[supplierId];
           console.log('Found note for supplier:', supplierNote);
         }
         
@@ -326,6 +339,49 @@ router.post('/', isKitchen, async (req, res) => {
       } catch (err) {
         console.error(`Error sending email to ${supplier.email}:`, err);
         emailErrors.push(`Errore nell'invio dell'email a ${supplier.name}: ${err.message}`);
+      }
+    }
+    
+    // Now handle note-only emails (no items)
+    if (supplierNotes && typeof supplierNotes === 'object') {
+      // Find suppliers that have notes but no items already processed
+      const processedSupplierIds = new Set(Object.keys(supplierItems));
+      
+      for (const [supplierId, note] of Object.entries(supplierNotes)) {
+        // Skip if we already processed this supplier above
+        if (processedSupplierIds.has(supplierId) || !note?.trim()) {
+          continue;
+        }
+        
+        try {
+          // Find the supplier
+          const supplier = await Supplier.findById(supplierId);
+          if (!supplier || !supplier.email) {
+            console.error(`Supplier ${supplierId} not found or has no email`);
+            emailErrors.push(`Nessuna email configurata per ${supplier?.name || 'fornitore sconosciuto'}`);
+            continue;
+          }
+          
+          console.log(`Sending note-only email to supplier ${supplier.name} <${supplier.email}>`);
+          
+          // Send email with just the note, no items
+          const emailResult = await emailService.sendEmail(
+            supplier.email,
+            [], // Empty items array
+            req.restaurantId,
+            note.trim()
+          );
+          
+          if (emailResult.success) {
+            console.log(`Note-only email sent successfully to ${supplier.name} with messageId: ${emailResult.messageId}`);
+          } else {
+            throw new Error(`Failed to send note-only email: ${emailResult.error}`);
+          }
+        } catch (err) {
+          console.error(`Error sending note-only email to supplier ${supplierId}:`, err);
+          const supplierName = await Supplier.findById(supplierId).then(s => s?.name || 'fornitore sconosciuto');
+          emailErrors.push(`Errore nell'invio dell'email a ${supplierName}: ${err.message}`);
+        }
       }
     }
     
