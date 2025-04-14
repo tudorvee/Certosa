@@ -218,7 +218,7 @@ router.post('/', isKitchen, async (req, res) => {
     console.log("Order request received:", req.body);
     console.log("Supplier notes received:", req.body.supplierNotes);
     
-    const { items = [], supplierNotes = {} } = req.body;
+    const { items = [], supplierNotes = {}, updateUnits = true } = req.body;
     
     // Validate that we have either items or supplier notes
     const hasItems = Array.isArray(items) && items.length > 0;
@@ -244,6 +244,151 @@ router.post('/', isKitchen, async (req, res) => {
     
     const savedOrder = await order.save();
     console.log("Order saved:", savedOrder);
+    
+    // Update units for items with custom units if updateUnits is true
+    const unitUpdateResults = [];
+    if (updateUnits && hasItems) {
+      console.log("🔄 UPDATING UNITS: Processing unit update requests");
+      console.log(`🔄 Order ID: ${savedOrder._id}`);
+      console.log(`🔄 Restaurant ID: ${req.user.restaurantId}`);
+      
+      for (const item of items) {
+        if (item.customUnit && item.customUnit !== item.unit) {
+          try {
+            console.log(`\n🔄 UPDATING UNIT: Item ${item.itemId} from ${item.unit} to ${item.customUnit}`);
+            
+            // First, verify this is a valid MongoDB ObjectId
+            const mongoose = require('mongoose');
+            
+            // Make sure the itemId is valid
+            if (!mongoose.Types.ObjectId.isValid(item.itemId)) {
+              console.error(`❌ Invalid item ID format: ${item.itemId}`);
+              unitUpdateResults.push({
+                itemId: item.itemId,
+                name: item.name,
+                oldUnit: item.unit,
+                newUnit: item.customUnit,
+                success: false,
+                error: 'Invalid item ID format'
+              });
+              continue;
+            }
+            
+            // First find the item to verify it exists and belongs to this restaurant
+            const existingItem = await Item.findById(item.itemId);
+            
+            if (!existingItem) {
+              console.error(`❌ Item not found: ${item.itemId}`);
+              unitUpdateResults.push({
+                itemId: item.itemId,
+                name: item.name,
+                oldUnit: item.unit,
+                newUnit: item.customUnit,
+                success: false,
+                error: 'Item not found'
+              });
+              continue;
+            }
+            
+            console.log(`✅ Item found: ${existingItem.name}`);
+            console.log(`   Current unit: ${existingItem.unit}`);
+            console.log(`   Item restaurant ID: ${existingItem.restaurantId}`);
+            console.log(`   User restaurant ID: ${req.user.restaurantId}`);
+            
+            // Check if the item belongs to the current restaurant
+            if (existingItem.restaurantId.toString() !== req.user.restaurantId.toString()) {
+              console.error(`❌ Item belongs to different restaurant`);
+              console.error(`   Item restaurant: ${existingItem.restaurantId}`);
+              console.error(`   User restaurant: ${req.user.restaurantId}`);
+              unitUpdateResults.push({
+                itemId: item.itemId,
+                name: item.name,
+                oldUnit: item.unit,
+                newUnit: item.customUnit,
+                success: false,
+                error: 'Item belongs to a different restaurant'
+              });
+              continue;
+            }
+            
+            // Now perform the update - DIRECT APPROACH
+            console.log(`🔄 Running direct update with updateOne...`);
+            const result = await Item.updateOne(
+              { _id: item.itemId },
+              { $set: { unit: item.customUnit } }
+            );
+            
+            console.log(`🔄 Direct update result:`, JSON.stringify(result, null, 2));
+            
+            if (result.matchedCount > 0 && result.modifiedCount > 0) {
+              console.log(`✅ SUCCESS: Updated item ${item.name} unit to ${item.customUnit}`);
+              unitUpdateResults.push({
+                itemId: item.itemId,
+                name: item.name,
+                oldUnit: item.unit,
+                newUnit: item.customUnit,
+                success: true
+              });
+            } else if (result.matchedCount > 0 && result.modifiedCount === 0) {
+              console.log(`⚠️ Item found but unit not changed (may already be ${item.customUnit})`);
+              unitUpdateResults.push({
+                itemId: item.itemId,
+                name: item.name,
+                oldUnit: item.unit,
+                newUnit: item.customUnit,
+                success: true,
+                message: 'Item unit not changed (may already have this unit)'
+              });
+            } else {
+              console.error(`❌ Update operation failed - no matching item found`);
+              unitUpdateResults.push({
+                itemId: item.itemId,
+                name: item.name,
+                oldUnit: item.unit,
+                newUnit: item.customUnit,
+                success: false,
+                error: 'Update operation failed'
+              });
+            }
+            
+            // Verify the change by fetching the item again
+            const verifyItem = await Item.findById(item.itemId);
+            if (verifyItem) {
+              console.log(`🔍 Verification - Item unit is now: ${verifyItem.unit}`);
+              if (verifyItem.unit === item.customUnit) {
+                console.log(`✅ Verification PASSED: Unit correctly updated`);
+              } else {
+                console.log(`❌ Verification FAILED: Unit not updated correctly`);
+              }
+            } else {
+              console.log(`❌ Verification FAILED: Could not find item after update`);
+            }
+          } catch (err) {
+            console.error(`❌ Error updating item ${item.itemId} unit:`, err);
+            unitUpdateResults.push({
+              itemId: item.itemId,
+              name: item.name,
+              oldUnit: item.unit,
+              newUnit: item.customUnit,
+              success: false,
+              error: err.message
+            });
+          }
+        }
+      }
+      
+      console.log("\n🔄 Unit update results summary:");
+      const successful = unitUpdateResults.filter(r => r.success).length;
+      const failed = unitUpdateResults.filter(r => !r.success).length;
+      console.log(`   ✅ Successful updates: ${successful}`);
+      console.log(`   ❌ Failed updates: ${failed}`);
+      
+      if (unitUpdateResults.length > 0) {
+        console.log("🔄 Unit update details:", JSON.stringify(unitUpdateResults, null, 2));
+      } else {
+        console.log("⚠️ No units were updated - no items with custom units different from original");
+      }
+    }
     
     // Initialize an object to group items by supplier for emails
     const supplierItems = {};
@@ -391,13 +536,31 @@ router.post('/', isKitchen, async (req, res) => {
       res.status(201).json({ 
         order: savedOrder,
         message: 'Ordine creato ma con errori nell\'invio delle email',
-        emailErrors
+        emailErrors,
+        unitUpdates: unitUpdateResults.length > 0 ? unitUpdateResults : undefined
       });
     } else {
       console.log('Order created successfully with all emails sent');
+      
+      // Include unit update information in the success message if applicable
+      let message = 'Ordine creato con successo';
+      
+      if (unitUpdateResults.length > 0) {
+        const successfulUpdates = unitUpdateResults.filter(update => update.success);
+        if (successfulUpdates.length > 0) {
+          message += ` e ${successfulUpdates.length} unità aggiornate permanentemente`;
+          console.log(`✅ Successfully updated ${successfulUpdates.length} units`);
+        } else {
+          console.log('⚠️ No units were successfully updated');
+        }
+      } else if (updateUnits) {
+        console.log('⚠️ updateUnits was true but no items had custom units different from their original units');
+      }
+      
       res.status(201).json({ 
         order: savedOrder,
-        message: 'Ordine creato con successo e tutte le email inviate'
+        message: message,
+        unitUpdates: unitUpdateResults.length > 0 ? unitUpdateResults : undefined
       });
     }
   } catch (err) {
@@ -476,6 +639,13 @@ router.post('/emergency-note', isKitchen, async (req, res) => {
       });
     }
     
+    if (!restaurant.emailConfig || !restaurant.emailConfig.senderEmail || !restaurant.emailConfig.smtpPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Restaurant email configuration is missing or incomplete'
+      });
+    }
+    
     // Create email content
     const noteText = req.body.note || "This is a default test note";
     const htmlContent = `
@@ -496,13 +666,13 @@ router.post('/emergency-note', isKitchen, async (req, res) => {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.EMAIL_USER || restaurant.emailConfig.senderEmail,
-        pass: process.env.EMAIL_PASS || restaurant.emailConfig.smtpPassword
+        user: restaurant.emailConfig.senderEmail,
+        pass: restaurant.emailConfig.smtpPassword
       }
     });
     
     // Send email
-    console.log(`Sending test email to ${supplier.email}`);
+    console.log(`Sending test email to ${supplier.email} from ${restaurant.emailConfig.senderEmail}`);
     const info = await transporter.sendMail({
       from: `"${restaurant.name} - TEST" <${restaurant.emailConfig.senderEmail}>`,
       to: supplier.email,
@@ -517,6 +687,7 @@ router.post('/emergency-note', isKitchen, async (req, res) => {
       success: true,
       message: 'Test email sent successfully',
       to: supplier.email,
+      from: restaurant.emailConfig.senderEmail,
       messageId: info.messageId
     });
   } catch (error) {

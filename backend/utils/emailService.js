@@ -2,21 +2,24 @@ const nodemailer = require('nodemailer');
 const Restaurant = require('../models/Restaurant');
 
 // Create a direct Gmail transporter - absolutely minimal
-const createDirectTransporter = async () => {
-  console.log('Creating DIRECT GMAIL transporter');
+const createDirectTransporter = async (restaurantId) => {
+  console.log('Creating DIRECT GMAIL transporter for restaurant:', restaurantId);
   
-  // Gmail app password
-  const EMAIL_USER = 'ristorantepancrazio@gmail.com';
-  const APP_PASSWORD = 'qguhsnaatdmqwkuz';
-  
-  console.log(`Using Gmail account: ${EMAIL_USER}`);
-  console.log(`Using app password: ${'*'.repeat(APP_PASSWORD.length)}`);
+  // Get the restaurant's email configuration
+  const restaurant = await Restaurant.findById(restaurantId);
+  if (!restaurant || !restaurant.emailConfig) {
+    console.error('Restaurant not found or missing email configuration');
+    throw new Error('Restaurant email configuration not found');
+  }
+
+  console.log(`Using restaurant email: ${restaurant.emailConfig.senderEmail}`);
+  console.log(`Using app password: ${'*'.repeat((restaurant.emailConfig.smtpPassword || '').length)}`);
   
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: EMAIL_USER,
-      pass: APP_PASSWORD
+      user: restaurant.emailConfig.senderEmail,
+      pass: restaurant.emailConfig.smtpPassword
     }
   });
   
@@ -44,7 +47,7 @@ const sendEmail = async (supplierEmail, items, restaurantId, note) => {
     }
     
     // Create direct transporter
-    const transporter = await createDirectTransporter();
+    const transporter = await createDirectTransporter(restaurantId);
     
     // Check if this is a note-only email
     const isNoteOnly = (!items || items.length === 0) && note && note.trim().length > 0;
@@ -116,7 +119,7 @@ const sendEmail = async (supplierEmail, items, restaurantId, note) => {
     
     // Send the email
     const info = await transporter.sendMail({
-      from: `"${restaurant.name}" <${process.env.EMAIL_USER || 'ristorantepancrazio@gmail.com'}>`,
+      from: `"${restaurant.name}" <${restaurant.emailConfig.senderEmail}>`,
       to: supplierEmail,
       subject: subject,
       html: emailHtml
@@ -146,7 +149,7 @@ const sendTestEmail = async (restaurantId) => {
     }
     
     // Create direct transporter
-    const transporter = await createDirectTransporter();
+    const transporter = await createDirectTransporter(restaurantId);
     
     // Test HTML email
     const testHtml = `
@@ -160,8 +163,8 @@ const sendTestEmail = async (restaurantId) => {
     `;
     
     const info = await transporter.sendMail({
-      from: `"${restaurant.name}" <${process.env.EMAIL_USER || 'ristorantepancrazio@gmail.com'}>`,
-      to: restaurant.emailConfig?.senderEmail || process.env.EMAIL_USER || 'ristorantepancrazio@gmail.com',
+      from: `"${restaurant.name}" <${restaurant.emailConfig.senderEmail}>`,
+      to: restaurant.emailConfig.senderEmail,
       subject: 'Test Email',
       html: testHtml
     });
@@ -188,7 +191,7 @@ const sendBasicEmail = async (supplierEmail, restaurantId, noteText) => {
     }
     
     // Create direct transporter
-    const transporter = await createDirectTransporter();
+    const transporter = await createDirectTransporter(restaurantId);
     
     // Test HTML with note
     const testHtml = `
@@ -207,7 +210,7 @@ const sendBasicEmail = async (supplierEmail, restaurantId, noteText) => {
     `;
     
     const info = await transporter.sendMail({
-      from: `"${restaurant.name}" <${process.env.EMAIL_USER || 'ristorantepancrazio@gmail.com'}>`,
+      from: `"${restaurant.name}" <${restaurant.emailConfig.senderEmail}>`,
       to: supplierEmail,
       subject: `🟡 TEST CON NOTA: ${noteText.substring(0, 20)}...`,
       html: testHtml
