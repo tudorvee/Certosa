@@ -200,6 +200,19 @@ function Navbar() {
               </>
             )}
             
+            {/* Kitchen can access Order History */}
+            {user && user.role === 'kitchen' && (
+              <li className="nav-item">
+                <Link 
+                  className="nav-link" 
+                  to="/history"
+                  style={isActive('/history') ? activeNavStyle : null}
+                >
+                  Storico Ordini
+                </Link>
+              </li>
+            )}
+            
             {/* Super Admin only navigation items */}
             {user && user.role === 'superadmin' && (
               <>

@@ -37,9 +37,9 @@ function App() {
                   </ProtectedRoute>
                 } />
                 
-                {/* Only Admin can access */}
+                {/* Kitchen and Admin can access Order History */}
                 <Route path="/history" element={
-                  <ProtectedRoute requiredRoles={['admin']}>
+                  <ProtectedRoute requiredRoles={['kitchen', 'admin']}>
                     <OrderHistory />
                   </ProtectedRoute>
                 } />
