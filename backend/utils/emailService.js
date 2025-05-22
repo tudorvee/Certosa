@@ -90,6 +90,26 @@ const sendEmail = async (supplierEmail, items, restaurantId, note) => {
       </table>`;
     }
     
+    // Define the postscript text
+    const postscriptHtml = `
+    <hr>
+    <p style="font-size:12px; color:#555;">
+      <strong>P.S. Ricordati che il nuovo codice destinatario per la fatturazione è cambiato. Altrimenti non saranno prese in carico le fatture per i pagamento:</strong><br><br>
+      QUI STA PANCRAZIO S.R.L.<br>
+      P. IVA: 16389011004<br>
+      SDI K95IV18<br><br>
+      MAMMAMIAMAMMAMIA SRL<br>
+      (Ristorante: Pizza Forum)<br>
+      P. IVA: 15523151007<br>
+      SDI K95IV18<br><br>
+      FESTAB SRL<br>
+      (Ristoranti: Mino e Luigi Cantina e Cucina)<br>
+      P. IVA: 16551941004<br>
+      SDI K95IV18<br><br>
+      Il nuovo codice SDI K95IV18 sostituisce il precedente ~SUBM70N~ per tutte le comunicazioni di fatturazione elettronica.
+    </p>
+    `;
+
     // Simplified email template
     const emailHtml = `
     <html>
@@ -101,6 +121,8 @@ const sendEmail = async (supplierEmail, items, restaurantId, note) => {
       ${tableSection}
       
       <p>Grazie,<br>${restaurant.name}</p>
+      
+      ${postscriptHtml}
     </body>
     </html>
     `;
